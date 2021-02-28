@@ -97,20 +97,39 @@ class StrExpr(Expr):
         return StrVal(self.val)
 
 
+class RefExpr(Expr):
+    def __init__(self, val: str):
+        self.val = val
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.val == rhs.val
+
+    def __repr__(self) -> str:
+        return 'RefExpr(%r)' % self.val
+
+    def eval(self, scope: Scope) -> Val:
+        if self.val not in scope:
+            raise Error('unknown var %r' % self.val)
+        else:
+            return scope[self.val]
+
+
 def builtins() -> Scope:
     return Scope()
 
 
 def eval(input: str, scope: Optional[Scope] = None) -> Val:
     lexer_, parser_ = loader.lexer_and_parser(r'''
+    id = "([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*";
     int = "-?[0-9]+";
     str = "'(^')*'";
-    expr -> int | str;
+    expr -> int | str | id;
     ''')
     expr: Expr = syntax.Syntax({
         syntax.rule_name('int', syntax.terminal(
             lambda val: IntExpr(int(val)))),
         syntax.rule_name('str', syntax.terminal(
             lambda val: StrExpr(val[1:-1]))),
+        syntax.rule_name('id', syntax.terminal(RefExpr)),
     })(parser_(lexer_(input)))
     return expr.eval(scope or builtins())

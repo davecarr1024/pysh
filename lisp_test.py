@@ -28,10 +28,20 @@ class LispTest(unittest.TestCase):
             lisp.StrExpr('a').eval(lisp.Scope()),
             lisp.StrVal('a'))
 
+    def test_ref_expr(self):
+        self.assertEqual(lisp.RefExpr('a'), lisp.RefExpr('a'))
+        self.assertNotEqual(lisp.RefExpr('a'), lisp.RefExpr('b'))
+        self.assertEqual(
+            lisp.RefExpr('a').eval(lisp.Scope(vals={'a':lisp.StrVal('b')})),
+            lisp.StrVal('b'))
+        with self.assertRaisesRegex(lisp.Error, 'unknown var \'a\''):
+            lisp.RefExpr('a').eval(lisp.Scope())
+
     def test_eval(self):
         for input, scope, expected_output in [
             ('-123', None, lisp.IntVal(-123)),
             ("'foo'", None, lisp.StrVal('foo')),
+            ('a', lisp.Scope(vals={'a': lisp.StrVal('b')}), lisp.StrVal('b')),
         ]:
             with self.subTest(input=input, scope=scope, expected_output=expected_output):
                 self.assertEqual(lisp.eval(input, scope), expected_output)
