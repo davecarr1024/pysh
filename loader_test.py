@@ -1,5 +1,10 @@
+import lexer
+import parser
 import loader
 import unittest
+import unittest.util
+
+unittest.util._MAX_LENGTH = 1000
 
 
 class LoaderTest(unittest.TestCase):
@@ -32,20 +37,29 @@ class LoaderTest(unittest.TestCase):
             with self.subTest(rule_str=rule_str, i=i, o=0):
                 self.assertEqual(loader.lexer_rule(rule_str)(i), o)
 
-    # def test_lexer_and_parser(self):
-    #     for s, cases in [
-    #         (r'''
-    #             id = "([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*";
-    #             ws ~= " +";
-    #             expr -> id;
-    #         ''', [
-    #             ('abc', None),
-    #         ]),
-    #     ]:
-    #         l, p = loader.lexer_and_parser(s)
-    #         for i, o in cases:
-    #             with self.subTest(s=s, i=i, o=o):
-    #                 self.assertEqual(p(l(i)), o)
+    def test_lexer_and_parser(self):
+        for s, cases in [
+            (r'''
+                id = "([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*";
+                ws ~= " +";
+                expr -> id;
+            ''', [
+                (
+                    'abc',
+                    parser.Node(
+                        rule_name='expr',
+                        children=[
+                            parser.Node(rule_name='id',
+                                        tok=lexer.Token('id', 'abc')),
+                        ]
+                    )
+                ),
+            ]),
+        ]:
+            l, p = loader.lexer_and_parser(s)
+            for i, o in cases:
+                with self.subTest(s=s, i=i, o=o):
+                    self.assertEqual(p(l(i)), o)
 
 
 if __name__ == '__main__':
