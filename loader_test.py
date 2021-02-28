@@ -11,47 +11,19 @@ unittest.util._MAX_LENGTH = 1000
 
 class LoaderTest(unittest.TestCase):
     def test_lexer_rule(self):
-        for rule_str, i, o in [
-            ('[a-z]', 'pA', 'p'),
-            ('[0-9]', '3', '3'),
-            ('[0-9]', 'a', None),
-            ('[a-z]*', 'abcd0', 'abcd'),
-            ('[a-z][A-Z]*', 'bA0', 'bA'),
-            ('([a-z][A-Z])*', 'aBcD123', 'aBcD'),
-            ('[a-z]+', 'abc0', 'abc'),
-            ('[a-z]+', '123', None),
-            ('abc', 'abc', 'abc'),
-            ('(a|[0-9])+', 'a3ab', 'a3a'),
-            ('(a|[0-9])+', 'b', None),
-            ('"(^")*"', '"foo"', '"foo"'),
-            ('a(^a)*a', 'abc', None),
-            ('\\[', '[a', '['),
-            ('\\[', ']', None),
-            ('a?', 'a', 'a'),
-            ('[0-9]+', '20', '20'),
-            ('-?', '-', '-'),
-            ('-?', '', ''),
-            ('-?[0-9]+', '-20', '-20'),
-            ('-?[0-9]+', '20', '20'),
-            ('-?[0-9]+', 'abc', None),
-            ('([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*', '_a1D_', '_a1D_'),
+        for rule_str, expected_rule in [
+            ('[a-z]', loader.LexerClass('a','z')),
+            ('abc', lexer.Literal('abc')),
+            ('\|', lexer.Literal('|')),
+            ('a*', lexer.ZeroOrMore(lexer.Literal('a'))),
+            ('a+', lexer.OneOrMore(lexer.Literal('a'))),
+            ('a?', lexer.ZeroOrOne(lexer.Literal('a'))),
+            ('^a', lexer.Not(lexer.Literal('a'))),
+            ('(a)(b)', lexer.And(lexer.Literal('a'),lexer.Literal('b'))),
+            ('(a|b)', lexer.Or(lexer.Literal('a'),lexer.Literal('b'))),
         ]:
-            with self.subTest(rule_str=rule_str, i=i, o=0):
-                self.assertEqual(loader.lexer_rule(rule_str)(i), o)
-
-    Pred = Callable[[parser.Node],bool]
-
-    @staticmethod
-    def rule(rule_name: str)->Pred:
-        return lambda node: node.rule_name == rule_name
-
-    @staticmethod
-    def tok(val: str)->Pred:
-        return lambda node: node.tok is not None and node.tok.val == val
-
-    @staticmethod
-    def and_(*preds: Pred)->Pred:
-        return lambda node: all([pred(node) for pred in preds])
+            with self.subTest(rule_str=rule_str, expected_rule=expected_rule):
+                self.assertEqual(loader.lexer_rule(rule_str), expected_rule)
 
     def test_lexer_and_parser(self):
         for s, cases in [
@@ -82,3 +54,4 @@ class LoaderTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

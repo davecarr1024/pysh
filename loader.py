@@ -4,6 +4,25 @@ import parser
 import syntax
 from typing import Dict, Optional, Sequence, Tuple
 
+class LexerClass:
+    def __init__(self, low: str, high: str):
+        self.low = low
+        self.high = high
+
+    @staticmethod
+    def build(val: str):
+        low, high = val.strip('[]').split('-')
+        return LexerClass(low, high)
+
+    def __repr__(self) -> str:
+        return 'LexerClass(low=%s, high=%s)' % (repr(self.low), repr(self.high))
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.low == rhs.low and self.high == rhs.high
+
+    def __call__(self, s: str) -> Optional[str]:
+        return s[0] if s and self.low <= s[0] <= self.high else None
+
 
 def lexer_rule(s: str) -> lexer.Rule:
     operators = {'*', '+', '(', ')', '|', '^', '?'}
@@ -88,18 +107,8 @@ def lexer_rule(s: str) -> lexer.Rule:
         ),
     }, 'rule')(toks)
 
-    class Class:
-        def __init__(self, val: str):
-            self.low, self.high = val.strip('[]').split('-')
-
-        def __repr__(self) -> str:
-            return '[%s-%s]' % (self.low, self.high)
-
-        def __call__(self, s: str) -> Optional[str]:
-            return s[0] if s and self.low <= s[0] <= self.high else None
-
     return syntax.Syntax({
-        syntax.rule_name('class', syntax.terminal(Class)),
+        syntax.rule_name('class', syntax.terminal(LexerClass.build)),
         syntax.rule_name('any', syntax.terminal(lexer.Literal)),
         syntax.rule_name('literal',
                          syntax.terminal(lambda val: lexer.Literal(val[1:]))),

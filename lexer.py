@@ -43,7 +43,7 @@ class Literal:
         self.val = val
 
     def __repr__(self) -> str:
-        return self.val
+        return 'Literal(val=%s)' % repr(self.val)
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.val == rhs.val
@@ -57,7 +57,7 @@ class ZeroOrMore:
         self.rule = rule
 
     def __repr__(self) -> str:
-        return '%s*' % self.rule
+        return 'ZeroOrMore(%s)' % self.rule
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.rule == rhs.rule
@@ -76,7 +76,7 @@ class OneOrMore:
         self.rule = rule
 
     def __repr__(self) -> str:
-        return '%s+' % self.rule
+        return 'OneOrMore(%s)' % self.rule
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.rule == rhs.rule
@@ -98,7 +98,7 @@ class ZeroOrOne:
         self.rule = rule
 
     def __repr__(self) -> str:
-        return '%s?' % self.rule
+        return 'ZeroOrOne(%s)' % self.rule
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.rule == rhs.rule
@@ -113,7 +113,7 @@ class And:
         self.rules = rules
 
     def __repr__(self) -> str:
-        return '(%s)' % ''.join(map(str, self.rules))
+        return 'And(%s)' % ', '.join(map(str, self.rules))
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.rules == rhs.rules
@@ -133,7 +133,7 @@ class Or:
         self.rules = rules
 
     def __repr__(self) -> str:
-        return '(%s)' % '|'.join(map(str, self.rules))
+        return 'Or(%s)' % ', '.join(map(str, self.rules))
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.rules == rhs.rules
@@ -150,7 +150,7 @@ class Not:
         self.rule = rule
 
     def __repr__(self) -> str:
-        return '^%s' % self.rule
+        return 'Not(%s)' % self.rule
 
     from typing import overload
 
