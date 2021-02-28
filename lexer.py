@@ -45,6 +45,9 @@ class Literal:
     def __repr__(self) -> str:
         return self.val
 
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.val == rhs.val
+
     def __call__(self, s: str) -> Optional[str]:
         return self.val if s.startswith(self.val) else None
 
@@ -55,6 +58,9 @@ class ZeroOrMore:
 
     def __repr__(self) -> str:
         return '%s*' % self.rule
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.rule == rhs.rule
 
     def __call__(self, s: str) -> Optional[str]:
         r = ''
@@ -71,6 +77,9 @@ class OneOrMore:
 
     def __repr__(self) -> str:
         return '%s+' % self.rule
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.rule == rhs.rule
 
     def __call__(self, s: str) -> Optional[str]:
         v = self.rule(s)
@@ -91,6 +100,9 @@ class ZeroOrOne:
     def __repr__(self) -> str:
         return '%s?' % self.rule
 
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.rule == rhs.rule
+
     def __call__(self, s: str) -> Optional[str]:
         v = self.rule(s)
         return v if v else ''
@@ -102,6 +114,9 @@ class And:
 
     def __repr__(self) -> str:
         return '(%s)' % ''.join(map(str, self.rules))
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.rules == rhs.rules
 
     def __call__(self, s: str) -> Optional[str]:
         r = ''
@@ -120,6 +135,9 @@ class Or:
     def __repr__(self) -> str:
         return '(%s)' % '|'.join(map(str, self.rules))
 
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.rules == rhs.rules
+
     def __call__(self, s: str) -> Optional[str]:
         vals = [val for val in [rule(s)
                                 for rule in self.rules] if val is not None]
@@ -134,6 +152,11 @@ class Not:
     def __repr__(self) -> str:
         return '^%s' % self.rule
 
+    from typing import overload
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.rule == rhs.rule
+
     def __call__(self, s: str) -> Optional[str]:
         return s[0] if s and self.rule(s) is None else None
 
@@ -145,6 +168,9 @@ class Lexer:
 
     def __repr__(self) -> str:
         return 'Lexer(%s, %s)' % (self.rules, self.silent_rules)
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.rules == rhs.rules and self.silent_rules == rhs.silent_rules
 
     def __call__(self, s: str) -> Sequence[Token]:
         toks: List[Token] = []
