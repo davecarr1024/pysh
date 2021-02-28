@@ -6,122 +6,150 @@ from typing import List as ListType, NamedTuple
 import unittest
 
 
-class Int(NamedTuple):
-    val: int
+class _Expr:
+    pass
 
 
-class List(NamedTuple):
-    vals: ListType[Int]
+class _Int(_Expr):
+    def __init__(self, val: int):
+        self.val = val
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, _Int) and self.val == rhs.val
 
 
-class Add(NamedTuple):
-    lhs: Int
-    rhs: Int
+class _Add(_Expr):
+    def __init__(self, lhs: _Expr, rhs: _Expr):
+        self.lhs = lhs
+        self.rhs = rhs
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, _Add) and self.lhs == rhs.lhs and self.rhs == rhs.rhs
 
 
-class Not(NamedTuple):
-    op: Int
+class _List(_Expr):
+    def __init__(self, vals: ListType[_Expr]):
+        self.vals = vals
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, _List) and self.vals == rhs.vals
+
+
+class _Not(_Expr):
+    def __init__(self, val: _Expr):
+        self.val = val
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, _Not) and self.val == rhs.val
 
 
 class SyntaxTest(unittest.TestCase):
-    def test_variadic(self):
+    @staticmethod
+    def list_rule() -> syntax.Rule:
+        return syntax.rule_name(
+            'list',
+            lambda node, exprs: _List(list(exprs)))
+
+    @staticmethod
+    def add_rule() -> syntax.Rule:
+        return syntax.rule_name('add', syntax.binary(_Add))
+
+    @staticmethod
+    def not_rule() -> syntax.Rule:
+        return syntax.rule_name('not', syntax.unary(_Not))
+
+    @staticmethod
+    def int_rule() -> syntax.Rule:
+        return syntax.rule_name('int', syntax.terminal(lambda val: _Int(int(val))))
+
+    def test_rulename(self):
         self.assertEqual(
-            syntax.variadic('list', List)(
+            self.list_rule()(
                 parser.Node(rule_name='list'),
-                [Int(1), Int(2)]
+                [_Int(1), _Int(2)]
             ),
-            List([Int(1), Int(2)])
+            _List([_Int(1), _Int(2)])
+        )
+        self.assertEqual(
+            self.list_rule()(
+                parser.Node(rule_name='notlist'),
+                [_Int(1), _Int(2)]
+            ),
+            None
         )
 
     def test_nary(self):
+        rule = syntax.nary(2, self.list_rule())
         self.assertEqual(
-            syntax.nary('list', 2, List)(
+            rule(
                 parser.Node(rule_name='list'),
-                [Int(1), Int(2)]
+                [_Int(1), _Int(2)]
             ),
-            List([Int(1), Int(2)])
+            _List([_Int(1), _Int(2)])
         )
         self.assertEqual(
-            syntax.nary('list', 2, List)(
+            rule(
                 parser.Node(rule_name='list'),
-                [Int(1)]
+                [_Int(1)]
             ),
             None
         )
 
     def test_binary(self):
         self.assertEqual(
-            syntax.binary('add', Add)(
+            self.add_rule()(
                 parser.Node(rule_name='add'),
-                [Int(1), Int(2)]
+                [_Int(1), _Int(2)]
             ),
-            Add(Int(1), Int(2))
+            _Add(_Int(1), _Int(2))
         )
         self.assertEqual(
-            syntax.binary('add', Add)(
+            self.add_rule()(
                 parser.Node(rule_name='add'),
-                [Int(1)]
+                [_Int(1)]
             ),
             None
         )
 
     def test_unary(self):
         self.assertEqual(
-            syntax.unary('not', Not)(
+            self.not_rule()(
                 parser.Node(rule_name='not'),
-                [Int(1)]
+                [_Int(1)]
             ),
-            Not(Int(1))
+            _Not(_Int(1))
         )
         self.assertEqual(
-            syntax.unary('not', Not)(
+            self.not_rule()(
                 parser.Node(rule_name='not'),
-                [Int(1), Int(2)]
+                [_Int(1), _Int(2)]
             ),
             None
         )
 
     def test_terminal(self):
         self.assertEqual(
-            syntax.terminal('int', lambda val: Int(int(val)))(
+            self.int_rule()(
                 parser.Node(rule_name='int', tok=lexer.Token('int', '1')),
                 []
             ),
-            Int(1)
+            _Int(1)
         )
         self.assertEqual(
-            syntax.terminal('int', lambda val: Int(int(val)))(
+            self.int_rule()(
                 parser.Node(rule_name='str', tok=lexer.Token('str', 'abc')),
                 []
             ),
             None
         )
 
-    def test_node(self):
-        self.assertEqual(
-            syntax.node(
-                'foo',
-                lambda node: Int(int(node.descendant('bar').tok_val()))
-            )(
-                parser.Node(
-                    rule_name='foo',
-                    children=[
-                        parser.Node(rule_name='bar',
-                                    tok=lexer.Token('int', '3'))
-                    ]
-                ),
-                []
-            ),
-            Int(3)
-        )
-
     def test_syntax(self):
         self.assertEqual(
             syntax.Syntax({
-                syntax.terminal('int', lambda val: Int(int(val))),
-                syntax.variadic('list', List),
-                syntax.binary('add', Add),
-                syntax.unary('not', Not),
+                self.int_rule(),
+                self.list_rule(),
+                self.add_rule(),
+                self.not_rule(),
             })(
                 parser.Node(
                     rule_name='list',
@@ -147,7 +175,7 @@ class SyntaxTest(unittest.TestCase):
                     ]
                 )
             ),
-            List([Int(1), Add(Int(2), Int(3)), Not(Int(4))])
+            _List([_Int(1), _Add(_Int(2), _Int(3)), _Not(_Int(4))])
         )
 
 

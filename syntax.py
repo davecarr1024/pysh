@@ -6,54 +6,27 @@ Expr = TypeVar('Expr')
 Rule = Callable[[parser.Node, Sequence[Expr]], Optional[Expr]]
 
 
-def variadic(
-    rule_name: str,
-    factory: Callable[[Sequence[Expr]], Optional[Expr]],
-) -> Rule:
+def rule_name(rule_name: str, rule: Rule) -> Rule:
     def impl(node: parser.Node, exprs: Sequence[Expr]) -> Optional[Expr]:
-        return factory(exprs) if node.rule_name == rule_name else None
+        return rule(node, exprs) if node.rule_name == rule_name else None
     return impl
 
 
-def nary(
-    rule_name: str,
-    n: int,
-    factory: Callable[[Sequence[Expr]], Optional[Expr]],
-) -> Rule:
-    return variadic(
-        rule_name,
-        lambda exprs: factory(exprs) if len(exprs) == n else None
-    )
+def nary(n: int, rule: Rule) -> Rule:
+    return lambda node, exprs: rule(node, exprs) if len(exprs) == n else None
 
 
-def unary(rule_name: str, factory: Callable[[Expr], Optional[Expr]]) -> Rule:
-    return nary(rule_name, 1, lambda exprs: factory(exprs[0]))
+def binary(factory: Callable[[Expr, Expr], Optional[Expr]]
+           ) -> Rule:
+    return nary(2, lambda node, exprs: factory(exprs[0], exprs[1]))
 
 
-def binary(
-    rule_name: str,
-    factory: Callable[[Expr, Expr],
-                      Optional[Expr]],
-) -> Rule:
-    return nary(rule_name, 2, lambda exprs: factory(exprs[0], exprs[1]))
+def unary(factory: Callable[[Expr], Optional[Expr]]) -> Rule:
+    return nary(1, lambda node, exprs: factory(exprs[0]))
 
 
-def terminal(rule_name: str, factory: Callable[[str], Optional[Expr]]) -> Rule:
-    def impl(node: parser.Node, exprs: Sequence[Expr]) -> Optional[Expr]:
-        if node.rule_name == rule_name and node.tok:
-            return factory(node.tok.val)
-        else:
-            return None
-    return impl
-
-
-def node(
-    rule_name: str,
-    factory: Callable[[parser.Node], Optional[Expr]],
-) -> Rule:
-    def impl(node: parser.Node, exprs: Sequence[Expr]) -> Optional[Expr]:
-        return factory(node) if node.rule_name == rule_name else None
-    return impl
+def terminal(factory: Callable[[str], Optional[Expr]]) -> Rule:
+    return lambda node, exprs: factory(node.tok.val) if node.tok else None
 
 
 class Syntax:
@@ -66,10 +39,10 @@ class Syntax:
             child_exprs.extend(self.apply_many(child_node))
         exprs = [expr for expr in [rule(node, child_exprs)
                                    for rule in self.rules] if expr]
-        assert len(exprs) <= 1, 'syntax error'
+        assert len(exprs) <= 1, 'syntax error %s' % exprs
         return [exprs[0]] if exprs else child_exprs
 
     def __call__(self, node: parser.Node) -> Expr:
         exprs: Sequence[Expr] = self.apply_many(node)
-        assert len(exprs) == 1, 'syntax error'
+        assert len(exprs) == 1, 'syntax error %s' % exprs
         return exprs[0]

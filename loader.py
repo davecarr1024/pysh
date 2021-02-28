@@ -99,86 +99,95 @@ def lexer_rule(s: str) -> lexer.Rule:
             return s[0] if s and self.low <= s[0] <= self.high else None
 
     return syntax.Syntax({
-        syntax.terminal('class', Class),
-        syntax.terminal('any', lexer.Literal),
-        syntax.terminal('literal', lambda val: lexer.Literal(val[1:])),
-        syntax.unary('zero_or_more', lexer.ZeroOrMore),
-        syntax.unary('one_or_more', lexer.OneOrMore),
-        syntax.unary('zero_or_one', lexer.ZeroOrOne),
-        syntax.unary('not', lexer.Not),
-        syntax.variadic('and', lambda rules: lexer.And(*rules)),
-        syntax.variadic('or', lambda rules: lexer.Or(*rules)),
+        syntax.rule_name('class', syntax.terminal(Class)),
+        syntax.rule_name('any', syntax.terminal(lexer.Literal)),
+        syntax.rule_name('literal',
+                         syntax.terminal(lambda val: lexer.Literal(val[1:]))),
+        syntax.rule_name('zero_or_more', syntax.unary(lexer.ZeroOrMore)),
+        syntax.rule_name('one_or_more', syntax.unary(lexer.OneOrMore)),
+        syntax.rule_name('zero_or_one', syntax.unary(lexer.ZeroOrOne)),
+        syntax.rule_name('not', syntax.unary(lexer.Not)),
+        syntax.rule_name('and', lambda node, rules: lexer.And(*rules)),
+        syntax.rule_name('or', lambda node, rules: lexer.Or(*rules)),
     })(node)
 
 
-def lexer_and_parser(s: str) -> Tuple[lexer.Lexer, parser.Parser]:
-    operators = {'=', '~=', ';', '->'}
-    lexer_rules: Dict[str, lexer.Rule] = {
-        operator: lexer.Literal(operator) for operator in operators}
-    lexer_rules.update({
-        'id': lexer_rule('([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*'),
-        'lexer_def': lexer_rule('"(^")*"'),
-    })
-    toks = lexer.Lexer(lexer_rules,
-                       {
-                           'ws': lexer.take_while(str.isspace),
-                       })(s)
+# def lexer_and_parser(s: str) -> Tuple[lexer.Lexer, parser.Parser]:
+#     operators = {'=', '~=', ';', '->'}
+#     lexer_rules: Dict[str, lexer.Rule] = {
+#         operator: lexer.Literal(operator) for operator in operators}
+#     lexer_rules.update({
+#         'id': lexer_rule('([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*'),
+#         'lexer_def': lexer_rule('"(^")*"'),
+#     })
+#     toks = lexer.Lexer(lexer_rules,
+#                        {
+#                            'ws': lexer.take_while(str.isspace),
+#                        })(s)
 
-    node = parser.Parser({
-        'lines': parser.one_or_more(
-            parser.or_(
-                parser.ref('lexer_rule'),
-                parser.ref('silent_lexer_rule'),
-                parser.ref('rule_decl'),
-            )
-        ),
-        'lexer_rule': parser.and_(
-            parser.literal('id'),
-            parser.literal('='),
-            parser.literal('lexer_def'),
-            parser.literal(';'),
-        ),
-        'silent_lexer_rule': parser.and_(
-            parser.literal('id'),
-            parser.literal('~='),
-            parser.literal('lexer_def'),
-            parser.literal(';'),
-        ),
-        'rule_decl': parser.and_(
-            parser.literal('id'),
-            parser.literal('->'),
-            parser.ref('rule'),
-            parser.literal(';'),
-        ),
-        'rule': parser.or_(
-            parser.literal('id'),
-        ),
-    }, 'lines')(toks)
+#     node = parser.Parser({
+#         'lines': parser.one_or_more(
+#             parser.or_(
+#                 parser.ref('lexer_rule'),
+#                 parser.ref('silent_lexer_rule'),
+#                 parser.ref('rule_decl'),
+#             )
+#         ),
+#         'lexer_rule': parser.and_(
+#             parser.literal('id'),
+#             parser.literal('='),
+#             parser.literal('lexer_def'),
+#             parser.literal(';'),
+#         ),
+#         'silent_lexer_rule': parser.and_(
+#             parser.literal('id'),
+#             parser.literal('~='),
+#             parser.literal('lexer_def'),
+#             parser.literal(';'),
+#         ),
+#         'rule_decl': parser.and_(
+#             parser.ref('rule_decl_id'),
+#             parser.literal('->'),
+#             parser.ref('rule'),
+#             parser.literal(';'),
+#         ),
+#         'rule_decl_id': parser.literal('id'),
+#         'rule': parser.or_(
+#             parser.literal('id'),
+#         ),
+#     }, 'lines')(toks)
 
-    lexer_ = lexer.Lexer({}, {})
-    parser_ = parser.Parser({}, '')
+#     lexer_ = lexer.Lexer({}, {})
+#     parser_ = parser.Parser({}, '')
 
-    def lexer_rule_(
-        node: parser.Node,
-        exprs: Sequence[parser.Rule],
-    ) -> Optional[parser.Rule]:
-        if node.rule_name == 'lexer_rule':
-            lexer_.rules[node.descendant('id').tok_val()] = lexer_rule(
-                node.descendant('lexer_def').tok_val().strip('"'))
-        if node.rule_name == 'silent_lexer_rule':
-            lexer_.silent_rules[node.descendant('id').tok_val()] = lexer_rule(
-                node.descendant('lexer_def').tok_val().strip('"'))
-        return None
+#     def lexer_rule_(
+#         node: parser.Node,
+#         exprs: Sequence[parser.Rule],
+#     ) -> Optional[parser.Rule]:
+#         if node.rule_name == 'lexer_rule':
+#             lexer_.rules[node.descendant('id').tok_val()] = lexer_rule(
+#                 node.descendant('lexer_def').tok_val().strip('"'))
+#         if node.rule_name == 'silent_lexer_rule':
+#             lexer_.silent_rules[node.descendant('id').tok_val()] = lexer_rule(
+#                 node.descendant('lexer_def').tok_val().strip('"'))
+#         return None
 
-    # def rule_decl(node: parser.Node)->Optional[parser.Rule]:
-    #   name = node.descendant('id').tok_val()
-    # def rule_decl(rule: parser.Rule)->Optional[parser.Rule]:
-    #   if not p.root:
-    #     name =
-    #     p.root = rule.
+#     def rule_decl(
+#         node: parser.Node,
+#         rules: Sequence[parser.Rule]
+#     ) -> Optional[parser.Rule]:
+#         if node.rule_name == 'rule_decl':
+#             name = node.descendant('rule_decl_id').descendant('id').tok_val()
+#             assert len(rules) == 1
+#             rule = rules[0]
+#             parser_.rules[name] = rule
+#             if not parser_.root:
+#                 parser_.root = name
+#             return None
 
-    assert not syntax.Syntax({
-        lexer_rule_,
-    }).apply_many(node)
+#     assert not syntax.Syntax({
+#         lexer_rule_,
+#         rule_decl,
+#     }).apply_many(node)
 
-    return lexer_, parser_
+#     return lexer_, parser_
