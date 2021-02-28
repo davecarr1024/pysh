@@ -28,20 +28,43 @@ class LispTest(unittest.TestCase):
             lisp.StrExpr('a').eval(lisp.Scope()),
             lisp.StrVal('a'))
 
-    def test_ref_expr(self):
-        self.assertEqual(lisp.RefExpr('a'), lisp.RefExpr('a'))
-        self.assertNotEqual(lisp.RefExpr('a'), lisp.RefExpr('b'))
+    def test_ref(self):
+        self.assertEqual(lisp.Ref('a'), lisp.Ref('a'))
+        self.assertNotEqual(lisp.Ref('a'), lisp.Ref('b'))
         self.assertEqual(
-            lisp.RefExpr('a').eval(lisp.Scope(vals={'a':lisp.StrVal('b')})),
+            lisp.Ref('a').eval(lisp.Scope(vals={'a': lisp.StrVal('b')})),
             lisp.StrVal('b'))
         with self.assertRaisesRegex(lisp.Error, 'unknown var \'a\''):
-            lisp.RefExpr('a').eval(lisp.Scope())
+            lisp.Ref('a').eval(lisp.Scope())
+
+    def test_add(self):
+        self.assertEqual(
+            lisp.Add().apply(lisp.Scope(), [lisp.IntVal(1)]),
+            lisp.IntVal(1))
+        self.assertEqual(
+            lisp.Add().apply(lisp.Scope(), [lisp.IntVal(1), lisp.IntVal(2)]),
+            lisp.IntVal(3))
+        self.assertEqual(
+            lisp.Add().apply(lisp.Scope(), [
+                lisp.StrVal('a'), lisp.StrVal('b')]),
+            lisp.StrVal('ab'))
+        with self.assertRaisesRegex(lisp.Error, 'underflow'):
+            lisp.Add().apply(lisp.Scope(), [])
+        with self.assertRaisesRegex(lisp.Error, 'mismatched args'):
+            lisp.Add().apply(lisp.Scope(), [lisp.StrVal('a'), lisp.IntVal(1)])
+
+    def test_call(self):
+        self.assertEqual(
+            lisp.Call(lisp.Ref('+'), [lisp.IntExpr(1), lisp.IntExpr(2)]).eval(
+                lisp.builtins()),
+            lisp.IntVal(3))
 
     def test_eval(self):
         for input, scope, expected_output in [
             ('-123', None, lisp.IntVal(-123)),
             ("'foo'", None, lisp.StrVal('foo')),
             ('a', lisp.Scope(vals={'a': lisp.StrVal('b')}), lisp.StrVal('b')),
+            ('(+ 1 2)', None, lisp.IntVal(3)),
         ]:
             with self.subTest(input=input, scope=scope, expected_output=expected_output):
                 self.assertEqual(lisp.eval(input, scope), expected_output)
