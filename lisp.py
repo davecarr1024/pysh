@@ -39,11 +39,6 @@ class Scope:
         return 'Scope(vals=%r, parent=%r)' % (self.vals, self.parent)
 
 
-class Expr(ABC):
-    @abstractmethod
-    def eval(self, scope: Scope) -> Val: pass
-
-
 class IntVal(Val):
     def __init__(self, val: int):
         self.val = val
@@ -56,20 +51,6 @@ class IntVal(Val):
 
     def apply(self, scope: Scope, vals: Sequence[Val]) -> Val:
         raise Error('int not callable')
-
-
-class IntExpr(Expr):
-    def __init__(self, val: int):
-        self.val = val
-
-    def __eq__(self, rhs: object) -> bool:
-        return isinstance(rhs, self.__class__) and self.val == rhs.val
-
-    def __repr__(self) -> str:
-        return 'IntExpr(%d)' % self.val
-
-    def eval(self, scope: Scope) -> Val:
-        return IntVal(self.val)
 
 
 class StrVal(Val):
@@ -102,6 +83,25 @@ class Add(Val):
             raise Error('unknown arg type %r' % type(vals[0]))
 
 
+class Expr(ABC):
+    @abstractmethod
+    def eval(self, scope: Scope) -> Val: pass
+
+
+class IntExpr(Expr):
+    def __init__(self, val: int):
+        self.val = val
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.val == rhs.val
+
+    def __repr__(self) -> str:
+        return 'IntExpr(%d)' % self.val
+
+    def eval(self, scope: Scope) -> Val:
+        return IntVal(self.val)
+
+
 class StrExpr(Expr):
     def __init__(self, val: str):
         self.val = val
@@ -124,7 +124,7 @@ class Ref(Expr):
         return isinstance(rhs, self.__class__) and self.val == rhs.val
 
     def __repr__(self) -> str:
-        return 'RefExpr(%r)' % self.val
+        return 'Ref(%r)' % self.val
 
     def eval(self, scope: Scope) -> Val:
         if self.val not in scope:
@@ -154,7 +154,7 @@ def builtins() -> Scope:
     })
 
 
-def eval(input: str, scope: Optional[Scope] = None) -> Val:
+def eval(input: str, scope: Optional[Scope]) -> Val:
     lexer_, parser_ = loader.lexer_and_parser(r'''
     id = "([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*";
     int = "-?[0-9]+";
@@ -173,4 +173,4 @@ def eval(input: str, scope: Optional[Scope] = None) -> Val:
         syntax.rule_name('op', syntax.terminal(Ref)),
         syntax.rule_name('call', lambda node, exprs: Call(exprs[0], exprs[1:])),
     })(parser_(lexer_(input)))
-    return expr.eval(scope or builtins())
+    return expr.eval(Scope(parent=scope or builtins()))

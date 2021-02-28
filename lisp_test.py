@@ -55,6 +55,15 @@ class LispTest(unittest.TestCase):
 
     def test_call(self):
         self.assertEqual(
+            lisp.Call(lisp.Ref('a'),[lisp.Ref('b')]),
+            lisp.Call(lisp.Ref('a'),[lisp.Ref('b')]))
+        self.assertNotEqual(
+            lisp.Call(lisp.Ref('a'),[lisp.Ref('b')]),
+            lisp.Call(lisp.Ref('c'),[lisp.Ref('b')]))
+        self.assertNotEqual(
+            lisp.Call(lisp.Ref('a'),[lisp.Ref('b')]),
+            lisp.Call(lisp.Ref('a'),[lisp.Ref('c')]))
+        self.assertEqual(
             lisp.Call(lisp.Ref('+'), [lisp.IntExpr(1), lisp.IntExpr(2)]).eval(
                 lisp.builtins()),
             lisp.IntVal(3))
@@ -64,7 +73,7 @@ class LispTest(unittest.TestCase):
             ('-123', None, lisp.IntVal(-123)),
             ("'foo'", None, lisp.StrVal('foo')),
             ('a', lisp.Scope(vals={'a': lisp.StrVal('b')}), lisp.StrVal('b')),
-            ('(+ 1 2)', None, lisp.IntVal(3)),
+            ('(+ 1 (+ 2))', None, lisp.IntVal(3)),
         ]:
             with self.subTest(input=input, scope=scope, expected_output=expected_output):
                 self.assertEqual(lisp.eval(input, scope), expected_output)
