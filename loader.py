@@ -122,13 +122,12 @@ def lexer_rule(s: str) -> lexer.Rule:
 
 
 def lexer_and_parser(s: str) -> Tuple[lexer.Lexer, parser.Parser]:
-    operators = {'=', '~=', ';', '->', '+'}
+    operators = {'=', '~=', ';', '->', '+', '*', '?', '|', '(', ')'}
     lexer_rules: Dict[str, lexer.Rule] = {
         operator: lexer.Literal(operator) for operator in operators}
     lexer_rules.update({
         'id': lexer_rule('([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*'),
         'lexer_def': lexer_rule('"(^")*"'),
-        '|': lexer_rule('\|'),
     })
     toks = lexer.Lexer(lexer_rules,
                        {
@@ -188,16 +187,32 @@ def lexer_and_parser(s: str) -> Tuple[lexer.Lexer, parser.Parser]:
             parser.Ref('unary_operand'),
             parser.Ref('unary_operation'),
         ),
+        'paren_rule': parser.And(
+            parser.Literal('('),
+            parser.Ref('rule'),
+            parser.Literal(')'),
+        ),
         'unary_operand': parser.Or(
             parser.Ref('ref'),
             parser.Ref('literal'),
+            parser.Ref('paren_rule'),
         ),
         'unary_operation': parser.Or(
             parser.Ref('one_or_more'),
+            parser.Ref('zero_or_more'),
+            parser.Ref('zero_or_one'),
         ),
         'one_or_more': parser.And(
             parser.Ref('unary_operand'),
             parser.Literal('+'),
+        ),
+        'zero_or_more': parser.And(
+            parser.Ref('unary_operand'),
+            parser.Literal('*'),
+        ),
+        'zero_or_one': parser.And(
+            parser.Ref('unary_operand'),
+            parser.Literal('?'),
         ),
     }, 'lines')(toks)
 
@@ -250,6 +265,8 @@ def lexer_and_parser(s: str) -> Tuple[lexer.Lexer, parser.Parser]:
         syntax.rule_name('or', lambda node, rules: parser.Or(*rules)),
         syntax.rule_name('and', lambda node, rules: parser.And(*rules)),
         syntax.rule_name('one_or_more', syntax.unary(parser.OneOrMore)),
+        syntax.rule_name('zero_or_more', syntax.unary(parser.ZeroOrMore)),
+        syntax.rule_name('zero_or_one', syntax.unary(parser.ZeroOrOne)),
     }).apply_many(node)
 
     return lexer_, parser_
