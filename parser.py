@@ -46,8 +46,8 @@ class Node:
     def nary_descendants(self, rule_name: str, n: int) -> Sequence[Node]:
         descendants = self.descendants(rule_name)
         assert len(descendants) == n, (
-            'unexpected number of descendants: got %d expected %d'
-            % (len(descendants), n))
+            'unexpected number of descendants: got %d expected %d, rule_name %s in %s'
+            % (len(descendants), n, rule_name, self))
         return descendants
 
     def binary_descendants(self, rule_name) -> Tuple[Node, Node]:
@@ -71,28 +71,42 @@ class IParser(ABC):
 Rule = Callable[[IParser, Sequence[lexer.Token]], Set[Node]]
 
 
-def literal(val: str) -> Rule:
-    def impl(parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
-        if toks and toks[0].rule_name == val:
-            return {Node(tok=toks[0], rule_name=val)}
+class literal:
+    def __init__(self, val: str):
+        self.val = val
+
+    def __repr__(self) -> str:
+        return '"%s"' % self.val
+
+    def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
+        if toks and toks[0].rule_name == self.val:
+            return {Node(tok=toks[0], rule_name=self.val)}
         else:
             return set()
-    return impl
 
 
-def ref(val: str) -> Rule:
-    def impl(parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
+class ref:
+    def __init__(self, val: str):
+        self.val = val
+
+    def __repr__(self) -> str:
+        return 'ref(%s)' % self.val
+
+    def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         return {
-            Node(rule_name=val, children=[node])
-            for node in parser.apply_rule(val, toks)
+            Node(rule_name=self.val, children=[node])
+            for node in parser.apply_rule(self.val, toks)
         }
-    return impl
 
 
-def and_(rule: Rule, *rest_rules: Rule) -> Rule:
-    rules = [rule] + list(rest_rules)
+class and_:
+    def __init__(self, rule: Rule, *rest_rules: Rule):
+        self.rules = [rule] + list(rest_rules)
 
-    def _impl(parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
+    def __repr__(self) -> str:
+        return 'and(%s)' % ', '.join(map(str, self.rules))
+
+    def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         def iter(
             rules: Sequence[Rule],
             toks: Sequence[lexer.Token],
@@ -105,27 +119,37 @@ def and_(rule: Rule, *rest_rules: Rule) -> Rule:
                 for node in rules[0](parser, toks)
                 for rest in iter(rules[1:], toks[len(node):])
             ]
-        return {Node(children=nodes) for nodes in iter(rules, toks)}
-    return _impl
+        return {Node(children=nodes) for nodes in iter(self.rules, toks)}
 
 
-def or_(*rules: Rule) -> Rule:
-    def _impl(parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
+class or_:
+    def __init__(self, *rules: Rule):
+        self.rules = rules
+
+    def __repr__(self) -> str:
+        return 'or(%s)' % ', '.join(map(str, self.rules))
+
+    def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         return set.union(
             set(),
             *[
                 {Node(children=[node])}
-                for rule in rules
+                for rule in self.rules
                 for node in rule(parser, toks)
             ]
         )
-    return _impl
 
 
-def zero_or_more(rule: Rule) -> Rule:
-    def _impl(parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
+class zero_or_more:
+    def __init__(self, rule: Rule):
+        self.rule = rule
+
+    def __repr__(self) -> str:
+        return '%s*' % self.rule
+
+    def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         def iter(toks: Sequence[lexer.Token]) -> List[List[Node]]:
-            nodes = rule(parser, toks)
+            nodes = self.rule(parser, toks)
             return [
                 [node] + rest
                 for node in nodes
@@ -137,13 +161,19 @@ def zero_or_more(rule: Rule) -> Rule:
             for nodes in
             nodess
         } if nodess else {Node()}
-    return _impl
 
 
-def one_or_more(rule: Rule) -> Rule:
-    def _impl(parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
+# def one_or_more(rule: Rule) -> Rule:
+class one_or_more:
+    def __init__(self, rule: Rule):
+        self.rule = rule
+
+    def __repr__(self) -> str:
+        return '%s+' % self.rule
+
+    def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         def iter(toks: Sequence[lexer.Token]) -> List[List[Node]]:
-            nodes = rule(parser, toks)
+            nodes = self.rule(parser, toks)
             return [
                 [node] + rest
                 for node in nodes
@@ -151,23 +181,30 @@ def one_or_more(rule: Rule) -> Rule:
             ] if nodes else [[]]
         return {
             Node(children=[node]+rest)
-            for node in rule(parser, toks)
+            for node in self.rule(parser, toks)
             for rest in iter(toks[len(node):])
         }
-    return _impl
 
 
-def zero_or_one(rule: Rule) -> Rule:
-    def _impl(parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
-        nodes = rule(parser, toks)
+class zero_or_one:
+    def __init__(self, rule: Rule):
+        self.rule = rule
+
+    def __repr__(self) -> str:
+        return '%s?' % self.rule
+
+    def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
+        nodes = self.rule(parser, toks)
         return {Node(children=[node]) for node in nodes} if nodes else {Node()}
-    return _impl
 
 
 class Parser(IParser):
     def __init__(self, rules: Dict[str, Rule], root: str):
         self.rules = rules
         self.root = root
+
+    def __repr__(self):
+        return 'Parser(rules=%s, root=%s)' % (self.rules, repr(self.root))
 
     def apply_rule(
         self,

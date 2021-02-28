@@ -1,6 +1,8 @@
+from __future__ import annotations
 import lexer
 import parser
 import loader
+from typing import Callable
 import unittest
 import unittest.util
 
@@ -37,28 +39,44 @@ class LoaderTest(unittest.TestCase):
             with self.subTest(rule_str=rule_str, i=i, o=0):
                 self.assertEqual(loader.lexer_rule(rule_str)(i), o)
 
+    Pred = Callable[[parser.Node],bool]
+
+    @staticmethod
+    def rule(rule_name: str)->Pred:
+        return lambda node: node.rule_name == rule_name
+
+    @staticmethod
+    def tok(val: str)->Pred:
+        return lambda node: node.tok is not None and node.tok.val == val
+
+    @staticmethod
+    def and_(*preds: Pred)->Pred:
+        return lambda node: all([pred(node) for pred in preds])
+
     def test_lexer_and_parser(self):
         for s, cases in [
             (r'''
                 id = "([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*";
                 ws ~= " +";
-                expr -> id;
+                expr -> id | paren_expr;
+                paren_expr -> "\(" expr+ "\)";
             ''', [
-                (
-                    'abc',
-                    parser.Node(
-                        rule_name='expr',
-                        children=[
-                            parser.Node(rule_name='id',
-                                        tok=lexer.Token('id', 'abc')),
-                        ]
-                    )
-                ),
+                # (
+                #     'abc',
+                #     parser.Node(
+                #         rule_name='expr',
+                #         children=[
+                #             parser.Node(rule_name='id',
+                #                         tok=lexer.Token('id', 'abc')),
+                #         ]
+                #     )
+                # ),
             ]),
         ]:
             l, p = loader.lexer_and_parser(s)
+
             for i, o in cases:
-                with self.subTest(s=s, i=i, o=o):
+                with self.subTest(parser=p, input=i):
                     self.assertEqual(p(l(i)), o)
 
 

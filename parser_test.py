@@ -110,10 +110,10 @@ class ParserTest(unittest.TestCase):
                     )])})
 
     def rule_cases(
-        self,
-        rule: parser.Rule,
+        self, 
+        rule: parser.Rule, 
         cases: Sequence[Tuple[Sequence[lexer.Token], Set[parser.Node]]],
-    ):
+        ):
         for i, o in cases:
             with self.subTest(i=i, o=o):
                 self.assertEqual(rule(parser.Parser({}, ''), i), o)
