@@ -88,17 +88,21 @@ class ParserTest(unittest.TestCase):
             parser.Node().tok_val()
 
     def test_literal(self):
+        self.assertEqual(parser.Literal('a'),parser.Literal('a'))
+        self.assertNotEqual(parser.Literal('a'),parser.Literal('b'))
         self.assertEqual(
-            parser.literal('id')(
+            parser.Literal('id')(
                 parser.Parser({}, ''),
                 [lexer.Token('id', 'a')],
             ),
             {parser.Node(tok=lexer.Token('id', 'a'), rule_name='id')})
 
     def test_ref(self):
+        self.assertEqual(parser.Ref('a'),parser.Ref('a'))
+        self.assertNotEqual(parser.Ref('a'),parser.Ref('b'))
         self.assertEqual(
-            parser.ref('idref')(
-                parser.Parser({'idref': parser.literal('id')}, ''),
+            parser.Ref('idref')(
+                parser.Parser({'idref': parser.Literal('id')}, ''),
                 [lexer.Token('id', 'a')],
             ),
             {parser.Node(
@@ -119,10 +123,18 @@ class ParserTest(unittest.TestCase):
                 self.assertEqual(rule(parser.Parser({}, ''), i), o)
 
     def test_and(self):
+        self.assertEqual(
+            parser.And(parser.Literal('a'),parser.Literal('b')),
+            parser.And(parser.Literal('a'),parser.Literal('b'))
+            )
+        self.assertNotEqual(
+            parser.And(parser.Literal('a'),parser.Literal('b')),
+            parser.And(parser.Literal('a'),parser.Literal('c'))
+            )
         self.rule_cases(
-            parser.and_(
-                parser.literal('id'),
-                parser.literal('='),
+            parser.And(
+                parser.Literal('id'),
+                parser.Literal('='),
             ),
             [
                 (
@@ -144,10 +156,18 @@ class ParserTest(unittest.TestCase):
         )
 
     def test_or(self):
+        self.assertEqual(
+            parser.Or(parser.Literal('a'),parser.Literal('b')),
+            parser.Or(parser.Literal('a'),parser.Literal('b'))
+            )
+        self.assertNotEqual(
+            parser.Or(parser.Literal('a'),parser.Literal('b')),
+            parser.Or(parser.Literal('a'),parser.Literal('c'))
+            )
         self.rule_cases(
-            parser.or_(
-                parser.literal('a'),
-                parser.literal('b'),
+            parser.Or(
+                parser.Literal('a'),
+                parser.Literal('b'),
             ),
             [
                 (
@@ -165,9 +185,17 @@ class ParserTest(unittest.TestCase):
         )
 
     def test_zero_or_more(self):
+        self.assertEqual(
+            parser.ZeroOrMore(parser.Literal('a')),
+            parser.ZeroOrMore(parser.Literal('a'))
+        )
+        self.assertNotEqual(
+            parser.ZeroOrMore(parser.Literal('a')),
+            parser.ZeroOrMore(parser.Literal('b'))
+        )
         self.rule_cases(
-            parser.zero_or_more(
-                parser.literal('id')
+            parser.ZeroOrMore(
+                parser.Literal('id')
             ),
             [
                 (
@@ -187,9 +215,17 @@ class ParserTest(unittest.TestCase):
         )
 
     def test_one_or_more(self):
+        self.assertEqual(
+            parser.OneOrMore(parser.Literal('a')),
+            parser.OneOrMore(parser.Literal('a'))
+        )
+        self.assertNotEqual(
+            parser.OneOrMore(parser.Literal('a')),
+            parser.OneOrMore(parser.Literal('b'))
+        )
         self.rule_cases(
-            parser.one_or_more(
-                parser.literal('id')
+            parser.OneOrMore(
+                parser.Literal('id')
             ),
             [
                 (
@@ -220,9 +256,17 @@ class ParserTest(unittest.TestCase):
         )
 
     def test_zero_or_one(self):
+        self.assertEqual(
+            parser.ZeroOrOne(parser.Literal('a')),
+            parser.ZeroOrOne(parser.Literal('a'))
+        )
+        self.assertNotEqual(
+            parser.ZeroOrOne(parser.Literal('a')),
+            parser.ZeroOrOne(parser.Literal('b'))
+        )
         self.rule_cases(
-            parser.zero_or_one(
-                parser.literal('id')
+            parser.ZeroOrOne(
+                parser.Literal('id')
             ),
             [
                 (
@@ -243,9 +287,21 @@ class ParserTest(unittest.TestCase):
 
     def test_parser(self):
         self.assertEqual(
+            parser.Parser({'a': parser.Literal('a')}, 'a'),
+            parser.Parser({'a': parser.Literal('a')}, 'a')
+        )
+        self.assertNotEqual(
+            parser.Parser({'a': parser.Literal('a')}, 'a'),
+            parser.Parser({'a': parser.Literal('b')}, 'a')
+        )
+        self.assertNotEqual(
+            parser.Parser({'a': parser.Literal('a')}, 'a'),
+            parser.Parser({'a': parser.Literal('a')}, 'b')
+        )
+        self.assertEqual(
             parser.Parser(
                 {
-                    'idref': parser.literal('id'),
+                    'idref': parser.Literal('id'),
                 },
                 'idref'
             )([lexer.Token('id', 'a')]),

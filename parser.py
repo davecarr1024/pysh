@@ -71,12 +71,15 @@ class IParser(ABC):
 Rule = Callable[[IParser, Sequence[lexer.Token]], Set[Node]]
 
 
-class literal:
+class Literal:
     def __init__(self, val: str):
         self.val = val
 
     def __repr__(self) -> str:
-        return '"%s"' % self.val
+        return 'Literal(%s)' % repr(self.val)
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.val == rhs.val
 
     def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         if toks and toks[0].rule_name == self.val:
@@ -85,12 +88,15 @@ class literal:
             return set()
 
 
-class ref:
+class Ref:
     def __init__(self, val: str):
         self.val = val
 
     def __repr__(self) -> str:
-        return 'ref(%s)' % self.val
+        return 'Ref(%s)' % repr(self.val)
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.val == rhs.val
 
     def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         return {
@@ -99,12 +105,15 @@ class ref:
         }
 
 
-class and_:
+class And:
     def __init__(self, rule: Rule, *rest_rules: Rule):
         self.rules = [rule] + list(rest_rules)
 
     def __repr__(self) -> str:
-        return 'and(%s)' % ', '.join(map(str, self.rules))
+        return 'And(%s)' % ', '.join(map(str, self.rules))
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.rules == rhs.rules
 
     def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         def iter(
@@ -122,12 +131,15 @@ class and_:
         return {Node(children=nodes) for nodes in iter(self.rules, toks)}
 
 
-class or_:
+class Or:
     def __init__(self, *rules: Rule):
         self.rules = rules
 
     def __repr__(self) -> str:
-        return 'or(%s)' % ', '.join(map(str, self.rules))
+        return 'Or(%s)' % ', '.join(map(str, self.rules))
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.rules == rhs.rules
 
     def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         return set.union(
@@ -140,12 +152,15 @@ class or_:
         )
 
 
-class zero_or_more:
+class ZeroOrMore:
     def __init__(self, rule: Rule):
         self.rule = rule
 
     def __repr__(self) -> str:
-        return '%s*' % self.rule
+        return 'ZeroOrMore(%s)' % self.rule
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.rule == rhs.rule
 
     def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         def iter(toks: Sequence[lexer.Token]) -> List[List[Node]]:
@@ -163,13 +178,15 @@ class zero_or_more:
         } if nodess else {Node()}
 
 
-# def one_or_more(rule: Rule) -> Rule:
-class one_or_more:
+class OneOrMore:
     def __init__(self, rule: Rule):
         self.rule = rule
 
     def __repr__(self) -> str:
-        return '%s+' % self.rule
+        return 'OneOrMore(%s)' % self.rule
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.rule == rhs.rule
 
     def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         def iter(toks: Sequence[lexer.Token]) -> List[List[Node]]:
@@ -186,12 +203,15 @@ class one_or_more:
         }
 
 
-class zero_or_one:
+class ZeroOrOne:
     def __init__(self, rule: Rule):
         self.rule = rule
 
     def __repr__(self) -> str:
-        return '%s?' % self.rule
+        return 'ZeroOrOne(%s)' % self.rule
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.rule == rhs.rule
 
     def __call__(self, parser: IParser, toks: Sequence[lexer.Token]) -> Set[Node]:
         nodes = self.rule(parser, toks)
@@ -206,6 +226,9 @@ class Parser(IParser):
     def __repr__(self):
         return 'Parser(rules=%s, root=%s)' % (self.rules, repr(self.root))
 
+    def __eq__(self, rhs: object):
+        return isinstance(rhs, self.__class__) and self.rules == rhs.rules and self.root == rhs.root
+
     def apply_rule(
         self,
         rule_name: str,
@@ -215,7 +238,7 @@ class Parser(IParser):
         return self.rules[rule_name](self, toks)
 
     def __call__(self, toks: Sequence[lexer.Token]) -> Node:
-        nodes = {node for node in ref(self.root)(
+        nodes = {node for node in Ref(self.root)(
             self, toks) if len(node) == len(toks)}
         assert nodes, 'parse error in %s' % toks
         return list(nodes)[0]
