@@ -21,11 +21,12 @@ class LoaderTest(unittest.TestCase):
             ('^a', lexer.Not(lexer.Literal('a'))),
             ('(a)(b)', lexer.And(lexer.Literal('a'), lexer.Literal('b'))),
             ('(a|b)', lexer.Or(lexer.Literal('a'), lexer.Literal('b'))),
+            ('a|b|c', lexer.Or(lexer.Literal('a'), lexer.Literal('b'), lexer.Literal('c'))),
         ]:
             with self.subTest(rule_str=rule_str, expected_rule=expected_rule):
                 self.assertEqual(loader.lexer_rule(rule_str), expected_rule)
 
-    def test_lexer_and_parser(self):
+    def _test_lexer_and_parser(self):
         for input, expected_lexer, expected_parser in [
             (
                 r'id = "abc";',
@@ -98,6 +99,7 @@ class LoaderTest(unittest.TestCase):
                 }, 'a')
             )
         ]:
+            print(input)
             with self.subTest(input=input, expected_lexer=expected_lexer, expected_parser=expected_parser):
                 actual_lexer, actual_parser = loader.lexer_and_parser(input)
                 self.assertEqual(actual_lexer, expected_lexer)

@@ -53,6 +53,21 @@ def lexer_rule(s: str) -> lexer.Rule:
             parser.Ref('or'),
             parser.Ref('and'),
         ),
+        'operand': parser.Or(
+            parser.Ref('unary_operand'),
+            parser.Ref('unary_operation'),
+        ),
+        'unary_operand': parser.Or(
+            parser.Literal('class'),
+            parser.Literal('any'),
+            parser.Literal('literal'),
+            parser.Ref('paren_rule'),
+        ),
+        'paren_rule': parser.And(
+            parser.Literal('('),
+            parser.Ref('rule'),
+            parser.Literal(')'),
+        ),
         'unary_operation': parser.Or(
             parser.Ref('zero_or_more'),
             parser.Ref('one_or_more'),
@@ -75,17 +90,6 @@ def lexer_rule(s: str) -> lexer.Rule:
             parser.Literal('^'),
             parser.Ref('unary_operand'),
         ),
-        'unary_operand': parser.Or(
-            parser.Literal('class'),
-            parser.Literal('any'),
-            parser.Literal('literal'),
-            parser.Ref('paren_rule'),
-        ),
-        'paren_rule': parser.And(
-            parser.Literal('('),
-            parser.Ref('rule'),
-            parser.Literal(')'),
-        ),
         'or': parser.And(
             parser.Ref('operand'),
             parser.OneOrMore(
@@ -100,10 +104,6 @@ def lexer_rule(s: str) -> lexer.Rule:
             parser.OneOrMore(
                 parser.Ref('operand'),
             ),
-        ),
-        'operand': parser.Or(
-            parser.Ref('unary_operand'),
-            parser.Ref('unary_operation'),
         ),
     }, 'rule')(toks)
 
