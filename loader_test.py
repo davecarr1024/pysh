@@ -26,7 +26,7 @@ class LoaderTest(unittest.TestCase):
             with self.subTest(rule_str=rule_str, expected_rule=expected_rule):
                 self.assertEqual(loader.lexer_rule(rule_str), expected_rule)
 
-    def _test_lexer_and_parser(self):
+    def test_lexer_and_parser(self):
         for input, expected_lexer, expected_parser in [
             (
                 r'id = "abc";',

@@ -311,20 +311,16 @@ class And:
                 [result] for result in self.rules[0](state)
             ]
             for rule in self.rules[1:]:
-                logger.print('iter and', self, rule, state)
                 next_resultss: List[List[Result]] = []
                 for results in resultss:
-                    logger.print('iter results and', self, state)
                     if results[-1].is_success():
                         advance = sum([result.num_toks() for result in results])
-                        logger.print('advance and', advance, self, state)
                         if advance > 0:
                             for rule_result in rule(state.next(advance)):
                                 next_resultss.append(results + [rule_result])
                     else:
                         next_resultss.append(results)
                 resultss = next_resultss
-            logger.print('finish', self)
             return {Success(children=results) for results in resultss}
 
 
@@ -388,25 +384,18 @@ class OneOrMore:
             pending_resultss: Set[Tuple[Result, ...]] = {(result,) for result in success_rule_results}
             final_resultss: Set[Tuple[Result, ...]] = set()
             while pending_resultss:
-                logger.print('iter', self, pending_resultss)
                 next_resultss: Set[Tuple[Result, ...]] = set()
                 for results in pending_resultss:
                     advance = sum([result.num_toks() for result in results])
-                    logger.print('iter results', self, advance, results)
                     if advance > 0:
                         for rule_result in self.rule(state.next(advance)):
-                            logger.print('rule_result', rule_result)
                             if rule_result.is_success() and rule_result.num_toks():
-                                logger.print('rule_result success')
                                 next_resultss.add(results + (rule_result,))
                             else:
                                 final_resultss.add(results)
-                                logger.print('rule_result failure')
                     else:
-                        logger.print('no advance')
                         final_resultss.add(results)
                         next_resultss.add(results)
-                logger.print('loop', len(next_resultss))
                 pending_resultss = next_resultss
             return {Success(children=list(results)) for results in final_resultss} | {Success(children=[result]) for result in rule_results - success_rule_results}
 
