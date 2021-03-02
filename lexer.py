@@ -3,9 +3,21 @@ import itertools
 from typing import Callable, Dict, List, NamedTuple, Optional, Sequence
 
 
+class Location(NamedTuple):
+    line: int
+    col: int
+
+
 class Token(NamedTuple):
     rule_name: str
     val: str
+    loc: Optional[Location] = None
+
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.rule_name == rhs.rule_name and self.val == rhs.val
+
+    def with_loc(self, loc: Location)->Token:
+        return Token(rule_name = self.rule_name, val = self.val, loc=loc)
 
 
 Rule = Callable[[str], Optional[str]]
@@ -175,6 +187,8 @@ class Lexer:
     def __call__(self, s: str) -> Sequence[Token]:
         toks: List[Token] = []
         pos = 0
+        line = 0
+        col = 0
         while pos < len(s):
             rule_toks = _apply_all_from(s[pos:], self.rules)
             silent_rule_toks = _apply_all_from(s[pos:], self.silent_rules)
@@ -187,10 +201,18 @@ class Lexer:
                     s[pos:min(pos+10, len(s))],
                     rule_toks + silent_rule_toks
                 ))
+
             if rule_toks:
                 tok = rule_toks[0]
-                toks.append(tok)
+                toks.append(tok.with_loc(Location(line,col)))
             else:
                 tok = silent_rule_toks[0]
-            pos += len(tok.val)
+
+            for c in tok.val:
+                if c == '\n':
+                    line += 1
+                    col = 0
+                else:
+                    col += 1
+                pos += 1
         return toks

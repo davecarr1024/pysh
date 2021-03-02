@@ -99,7 +99,6 @@ class LoaderTest(unittest.TestCase):
                 }, 'a')
             )
         ]:
-            print(input)
             with self.subTest(input=input, expected_lexer=expected_lexer, expected_parser=expected_parser):
                 actual_lexer, actual_parser = loader.lexer_and_parser(input)
                 self.assertEqual(actual_lexer, expected_lexer)

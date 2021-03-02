@@ -85,10 +85,14 @@ class LexerTest(unittest.TestCase):
             lexer.Lexer({'a': lexer.Literal('a')},{}),
             lexer.Lexer({'a': lexer.Literal('b')},{}),
         )
-        self.assertEqual(lexer.Lexer(
+        toks = lexer.Lexer(
             {'id': lexer.take_while(str.isalpha)},
-            {'ws': lexer.take_while(str.isspace)})(' a b '),
-            [lexer.Token('id', 'a'), lexer.Token('id', 'b')])
+            {'ws': lexer.take_while(str.isspace)})(' a\nb ')
+        self.assertEqual([lexer.Token('id', 'a'), lexer.Token('id', 'b')], toks)
+        self.assertEqual(
+            [lexer.Location(line=0,col=1),lexer.Location(line=1,col=0)],
+            [tok.loc for tok in toks]
+        )
         with self.assertRaisesRegex(Exception, 'lex error at 0'):
             lexer.Lexer({'id': lexer.take_while(str.isalpha)}, {
                         'ws': lexer.take_while(str.isspace)})('(a)')

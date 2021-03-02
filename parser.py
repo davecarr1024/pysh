@@ -464,21 +464,26 @@ class Parser(IParser):
             return list(successes)[0].to_node()
         elif len(successes) > 1:
             raise Error('ambiguous result %r' % successes)
-        else:
-            failures = {cast(Failure, result) for result in set.union(
-                *[result.get_failures() for result in results])}
-            if not failures:
-                raise Error('unknown parse error')
-            else:
-                max_pos = max([failure.pos for failure in failures])
-                max_failures = {
-                    failure for failure in failures if failure.pos == max_pos}
+        failures = {cast(Failure, result) for result in set.union(
+            *[result.get_failures() for result in results])}
+        if not failures:
+            raise Error('unknown parse error')
+        print('failures', '\n'.join(map(str, failures)))
+        max_pos = max([failure.pos for failure in failures])
+        max_failures = {
+            failure for failure in failures if failure.pos == max_pos}
 
-                def format_pos(pos: int) -> str:
-                    return repr(' '.join(
-                        [tok.val for tok in toks[max_pos:min(len(toks), max_pos + 5)]])) if pos < len(toks) else 'end of input'
-                raise Error('parse error at %s: %s' % (
-                    format_pos(max_pos),
-                    ' '.join(
-                        map(repr, sorted([failure.msg for failure in max_failures])))
-                ))
+        def format_pos(pos: int) -> str:
+            if pos >= len(toks):
+                return 'eof'
+            else:
+                tok = toks[pos]
+                if toks[pos].loc:
+                    return '%r (%s)' % (tok.val, tok.loc)
+                else:
+                    return tok.val
+        raise Error('parse error at %s: %s' % (
+            format_pos(max_pos),
+            ' '.join(
+                map(repr, sorted([failure.msg for failure in max_failures])))
+        ))
