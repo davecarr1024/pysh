@@ -1,11 +1,14 @@
 from __future__ import annotations
 import itertools
-from typing import Callable, Dict, List, NamedTuple, Optional, Sequence
+from typing import Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 
 class Location(NamedTuple):
     line: int
     col: int
+
+    def __lt__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and (self.line < rhs.line or self.col < rhs.col)
 
 
 class Token(NamedTuple):
@@ -13,11 +16,11 @@ class Token(NamedTuple):
     val: str
     loc: Optional[Location] = None
 
-    def __eq__(self, rhs: object)->bool:
+    def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.rule_name == rhs.rule_name and self.val == rhs.val
 
-    def with_loc(self, loc: Location)->Token:
-        return Token(rule_name = self.rule_name, val = self.val, loc=loc)
+    def with_loc(self, loc: Location) -> Token:
+        return Token(rule_name=self.rule_name, val=self.val, loc=loc)
 
 
 Rule = Callable[[str], Optional[str]]
@@ -204,7 +207,7 @@ class Lexer:
 
             if rule_toks:
                 tok = rule_toks[0]
-                toks.append(tok.with_loc(Location(line,col)))
+                toks.append(tok.with_loc(Location(line, col)))
             else:
                 tok = silent_rule_toks[0]
 

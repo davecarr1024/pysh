@@ -1,629 +1,346 @@
 from __future__ import annotations
 import lexer
 import parser
-from typing import Optional, Sequence, Set, Tuple
+from typing import Callable, Optional, Set
 import unittest
-import unittest.util
 
+import unittest.util
 unittest.util._MAX_LENGTH = 1000
 
 
-def empty_success(*children: parser.Result) -> parser.Success:
-    return parser.Success(children=list(children))
+def node(*children: parser.Node) -> parser.Node:
+    return parser.Node(children=children)
 
 
-def rule_success(rule_name: str, *children: parser.Result) -> parser.Success:
-    return parser.Success(rule_name=rule_name, children=list(children))
+def rule_node(rule_name: Optional[str], *children: parser.Node) -> parser.Node:
+    return parser.Node(rule_name=rule_name, children=children)
 
 
-def token_success(rule_name: str, val: Optional[str] = None) -> parser.Success:
-    return parser.Success(rule_name=rule_name, tok=lexer.Token(rule_name=rule_name, val=val or rule_name))
+def token(rule_name: str, val: Optional[str] = None, loc: Optional[lexer.Location] = None) -> lexer.Token:
+    return lexer.Token(rule_name=rule_name, val=val or rule_name, loc=loc)
 
 
-def token(rule_name: str, val: Optional[str] = None) -> lexer.Token:
-    return lexer.Token(rule_name=rule_name, val=val or rule_name)
+def token_node(rule_name: str, tok: Optional[lexer.Token] = None) -> parser.Node:
+    return parser.Node(rule_name=rule_name, tok=tok or token(rule_name))
+
+
+def apply_rule_parser(rule: parser.Rule, parser_: parser.Parser, *toks: lexer.Token) -> parser.Node:
+    return rule(parser.State(parser=parser_, toks=list(toks)))
+
+
+def apply_rule(rule: parser.Rule, *toks: lexer.Token) -> parser.Node:
+    return apply_rule_parser(rule, parser.Parser({}, ''), *toks)
 
 
 class ParserTest(unittest.TestCase):
-    def test_node_eq(self):
-        self.assertEqual(parser.Node(tok=lexer.Token('id', 'a')),
-                         parser.Node(tok=lexer.Token('id', 'a')))
-        self.assertNotEqual(parser.Node(tok=lexer.Token(
-            'id', 'a')), parser.Node(tok=lexer.Token('id', 'b')))
-        self.assertEqual(parser.Node(rule_name='a'),
-                         parser.Node(rule_name='a'))
-        self.assertNotEqual(parser.Node(rule_name='a'),
-                            parser.Node(rule_name='b'))
+    def test_node(self):
         self.assertEqual(
-            parser.Node(children=[parser.Node(rule_name='a')]),
-            parser.Node(children=[parser.Node(rule_name='a')]))
+            node(rule_node('a', token_node('b', 'c'))),
+            node(rule_node('a', token_node('b', 'c'))))
         self.assertNotEqual(
-            parser.Node(children=[parser.Node(rule_name='a')]),
-            parser.Node(children=[parser.Node(rule_name='b')]))
-
-    def test_node_len(self):
-        self.assertEqual(
-            2,
-            len(parser.Node(
-                tok=lexer.Token('id', 'a'),
-                children=[
-                    parser.Node(rule_name='b'),
-                    parser.Node(tok=lexer.Token('id', 'c')),
-                ]
-            )))
-
-    def test_node_descendants(self):
-        self.assertEqual(
-            [parser.Node(rule_name='a')],
-            parser.Node(children=[
-                parser.Node(rule_name='a'),
-                parser.Node(rule_name='b'),
-            ]).descendants('a'))
-
-    def test_node_nary_descendants(self):
-        self.assertEqual([parser.Node(rule_name='a'),
-                          parser.Node(rule_name='a'),
-                          parser.Node(rule_name='a')],
-                         parser.Node(children=[
-                             parser.Node(rule_name='a'),
-                             parser.Node(rule_name='a'),
-                             parser.Node(rule_name='a'),
-                             parser.Node(rule_name='b'),
-                         ]).nary_descendants('a', 3))
-        with self.assertRaisesRegex(
-                Exception,
-                'unexpected number of descendants'):
-            parser.Node(children=[
-                parser.Node(rule_name='a'),
-                parser.Node(rule_name='a'),
-                parser.Node(rule_name='a'),
-                parser.Node(rule_name='b'),
-            ]).nary_descendants('a', 4)
-
-    def test_node_binary_descendants(self):
-        a = parser.Node(rule_name='r', tok=lexer.Token('id', 'a'))
-        b = parser.Node(rule_name='r', tok=lexer.Token('id', 'b'))
-        self.assertEqual(
-            (a, b),
-            parser.Node(
-                children=[
-                    a,
-                    b,
-                    parser.Node(rule_name='q'),
-                ]).binary_descendants('r'))
-
-    def test_node_desendant(self):
-        a = parser.Node(rule_name='r', tok=lexer.Token('id', 'a'))
-        self.assertEqual(a, parser.Node(
-            children=[a, parser.Node(rule_name='q')]).descendant('r'))
-
-    def test_tok_val(self):
-        self.assertEqual('a', parser.Node(
-            tok=lexer.Token('id', 'a')).tok_val())
-        with self.assertRaisesRegex(Exception, 'expected tok'):
-            parser.Node().tok_val()
-
-    def test_success(self):
-        self.assertEqual(parser.Success(tok=lexer.Token('id', 'a')),
-                         parser.Success(tok=lexer.Token('id', 'a')))
+            node(rule_node('a', token_node('b', 'c'))),
+            node(rule_node('d', token_node('b', 'c'))))
         self.assertNotEqual(
-            parser.Success(tok=lexer.Token('id', 'a')),
-            parser.Success(tok=lexer.Token('id', 'b')))
-        self.assertEqual(parser.Success(rule_name='a'),
-                         parser.Success(rule_name='a'))
-        self.assertNotEqual(parser.Success(rule_name='a'),
-                            parser.Success(rule_name='b'))
-        self.assertEqual(
-            parser.Success(children=[parser.Success(rule_name='a')]),
-            parser.Success(children=[parser.Success(rule_name='a')]))
+            node(rule_node('a', token_node('b', 'c'))),
+            node(rule_node('a', token_node('d', 'c'))))
         self.assertNotEqual(
-            parser.Success(children=[parser.Success(rule_name='a')]),
-            parser.Success(children=[parser.Success(rule_name='b')]))
+            node(rule_node('a', token_node('b', 'c'))),
+            node(rule_node('a', token_node('b', 'd'))))
+        self.assertEqual(len(node()), 0)
+        self.assertEqual(len(node(token_node('a'))), 1)
+
+    def test_terminal_error(self):
         self.assertEqual(
-            2,
-            parser.Success(
-                tok=lexer.Token('id', 'a'),
-                children=[
-                    parser.Success(rule_name='b'),
-                    parser.Success(tok=lexer.Token('id', 'c')),
-                ]
-            ).num_toks())
-        self.assertTrue(parser.Success().is_success())
-        self.assertFalse(parser.Success(
-            children=[parser.Failure(0, '')]).is_success())
+            parser.TerminalError('a', lexer.Location(0, 1)),
+            parser.TerminalError('a', lexer.Location(0, 1)))
+        self.assertNotEqual(
+            parser.TerminalError('a', lexer.Location(0, 1)),
+            parser.TerminalError('b', lexer.Location(0, 1)))
+        self.assertNotEqual(
+            parser.TerminalError('a', lexer.Location(0, 1)),
+            parser.TerminalError('a', lexer.Location(2, 1)))
+        self.assertNotEqual(
+            parser.TerminalError('a', lexer.Location(0, 1)),
+            parser.TerminalError('a', lexer.Location(0, 2)))
         self.assertEqual(
-            parser.Success(
-                tok=lexer.Token('id', 'a'),
-                children=[
-                    parser.Success(rule_name='b'),
-                    parser.Success(tok=lexer.Token('id', 'c')),
-                ]).to_node(),
-            parser.Node(
-                tok=lexer.Token('id', 'a'),
-                children=[
-                    parser.Node(rule_name='b'),
-                    parser.Node(tok=lexer.Token('id', 'c')),
-                ])
+            parser.TerminalError('a', lexer.Location(0, 1)).max(),
+            (lexer.Location(0, 1), [parser.TerminalError('a', lexer.Location(0, 1))]))
+
+    def test_compound_error(self):
+        self.assertEqual(
+            parser.CompoundError([parser.TerminalError('a')]),
+            parser.CompoundError([parser.TerminalError('a')])
         )
-        self.assertEqual(parser.Success(
-            children=[
-                parser.Failure(0, 'error1'),
-                parser.Failure(1, 'error2'),
-            ]
-        ).get_failures(),
-            {
-            parser.Failure(0, 'error1'),
-            parser.Failure(1, 'error2'),
+        self.assertNotEqual(
+            parser.CompoundError([parser.TerminalError('a')]),
+            parser.CompoundError([parser.TerminalError('b')])
+        )
+        self.assertEqual(
+            parser.CompoundError([
+                parser.TerminalError('a', lexer.Location(0, 0)),
+                parser.TerminalError('b', lexer.Location(1, 0)),
+                parser.TerminalError('c', lexer.Location(1, 0)),
+                parser.TerminalError('d'),
+            ]).max(),
+            (lexer.Location(1, 0), [
+                parser.TerminalError('b', lexer.Location(1, 0)),
+                parser.TerminalError('c', lexer.Location(1, 0)),
+            ])
+        )
+        self.assertEqual(
+            parser.CompoundError([
+                parser.TerminalError('a'),
+                parser.TerminalError('b'),
+            ]).max(),
+            (None, [
+                parser.TerminalError('a'),
+                parser.TerminalError('b'),
+            ])
+        )
 
-        })
+    def test_context_error(self):
+        self.assertEqual(
+            parser.ContextError('a', parser.TerminalError('b')),
+            parser.ContextError('a', parser.TerminalError('b')),
+        )
+        self.assertNotEqual(
+            parser.ContextError('a', parser.TerminalError('b')),
+            parser.ContextError('c', parser.TerminalError('b')),
+        )
+        self.assertNotEqual(
+            parser.ContextError('a', parser.TerminalError('b')),
+            parser.ContextError('a', parser.TerminalError('c')),
+        )
+        self.assertEqual(
+            parser.ContextError(
+                'a',
+                parser.TerminalError('b', lexer.Location(0, 1))
+            ).max(),
+            (lexer.Location(0, 1), [
+                parser.ContextError(
+                    'a',
+                    parser.TerminalError('b', lexer.Location(0, 1))
+                )
+            ])
+        )
+        self.assertEqual(
+            parser.ContextError(
+                'a',
+                parser.CompoundError([
+                    parser.TerminalError('b', lexer.Location(0, 1)),
+                    parser.TerminalError('c', lexer.Location(0, 1)),
+                ])
+            ).max(),
+            (
+                lexer.Location(0, 1),
+                [
+                    parser.ContextError(
+                        'a',
+                        parser.TerminalError('b', lexer.Location(0, 1))
+                    ),
+                    parser.ContextError(
+                        'a',
+                        parser.TerminalError('c', lexer.Location(0, 1))
+                    ),
+                ]
+            )
+        )
 
-    def test_failure(self):
-        self.assertEqual(parser.Failure(1, 'error'),
-                         parser.Failure(1, 'error'))
-        self.assertNotEqual(parser.Failure(1, 'error'),
-                            parser.Failure(1, 'noterror'))
-        self.assertNotEqual(parser.Failure(1, 'error'),
-                            parser.Failure(2, 'error'))
-        self.assertFalse(parser.Failure(1, 'error').is_success())
-        self.assertEqual(parser.Failure(1, 'error').get_failures(),
-                         {parser.Failure(1, 'error')})
+    def assert_error(self,
+                     f: Callable[[], None],
+                     expected: parser.Error) -> None:
+        try:
+            f()
+            self.fail('expected error')
+        except parser.Error as e:
+            self.assertEqual(e, expected)
 
     def test_literal(self):
-        self.assertEqual(parser.Literal('a'), parser.Literal('a'))
-        self.assertNotEqual(parser.Literal('a'), parser.Literal('b'))
-        self.assertEqual(
-            parser.Literal('id')(
-                parser.State(
-                    parser=parser.Parser({}, ''),
-                    toks=[lexer.Token('id', 'a')],
-                )
-            ),
-            {parser.Success(tok=lexer.Token('id', 'a'), rule_name='id')})
-        self.assertEqual(
-            parser.Literal('id')(
-                parser.State(
-                    parser=parser.Parser({}, ''),
-                    toks=[lexer.Token('notid', 'a')],
-                )
-            ),
-            {parser.Failure(0, "failed to find literal 'id'")})
+        def literal(*toks: lexer.Token) -> parser.Node:
+            return apply_rule(parser.Literal('a'), *toks)
+        self.assertEqual(literal(token('a')), token_node('a'))
+        self.assert_error(
+            lambda: literal(token('b', loc=lexer.Location(0, 0))),
+            parser.TerminalError('failed to find literal \'a\'', lexer.Location(0, 0)))
+        self.assert_error(
+            lambda: literal(),
+            parser.TerminalError('failed to find literal \'a\': eof'))
 
     def test_ref(self):
-        self.assertEqual(parser.Ref('a'), parser.Ref('a'))
-        self.assertNotEqual(parser.Ref('a'), parser.Ref('b'))
+        def ref(*toks: lexer.Token) -> parser.Node:
+            return apply_rule_parser(
+                parser.Ref('a'),
+                parser.Parser({'a': parser.Literal('b')}, 'a'),
+                *toks
+            )
         self.assertEqual(
-            parser.Ref('idref')(
-                parser.State(
-                    parser.Parser({'idref': parser.Literal('id')}, ''),
-                    [lexer.Token('id', 'a')],
-                )
-            ),
-            {parser.Success(
-                rule_name='idref',
-                children=[
-                    parser.Success(
-                        tok=lexer.Token('id', 'a'),
-                        rule_name='id'
-                    )])})
-        self.assertEqual(
-            parser.Ref('idref')(
-                parser.State(
-                    parser.Parser({}, ''),
-                    [],
-                )
-            ),
-            {parser.Failure(pos=0, msg="unknown ref 'idref'")})
+            ref(token('b')),
+            node(token_node('a', token('b'))))
+        self.assert_error(
+            lambda: apply_rule(parser.Ref('a')),
+            parser.TerminalError('unknown rule \'a\'')
+        )
+        self.assert_error(
+            lambda: ref(token('c')),
+            parser.ContextError(
+                'failed to apply rule \'a\'',
+                parser.TerminalError('failed to find literal \'b\'')
+            )
+        )
 
     def test_and(self):
+        def and_(*toks: lexer.Token) -> parser.Node:
+            return apply_rule(parser.And(
+                parser.Literal('a'),
+                parser.Literal('b'),
+            ), *toks)
         self.assertEqual(
-            parser.And(parser.Literal('a'), parser.Literal('b')),
-            parser.And(parser.Literal('a'), parser.Literal('b'))
+            and_(token('a'), token('b')),
+            node(token_node('a'), token_node('b'))
         )
-        self.assertNotEqual(
-            parser.And(parser.Literal('a'), parser.Literal('b')),
-            parser.And(parser.Literal('a'), parser.Literal('c'))
+        self.assert_error(
+            lambda: and_(token('a')),
+            parser.TerminalError('failed to find literal \'b\': eof')
         )
-        for toks, expected_result in [
-            (
-                [lexer.Token('a', 'a'), lexer.Token('b', 'b')],
-                {parser.Success(children=[
-                    parser.Success(tok=lexer.Token('a', 'a'), rule_name='a'),
-                    parser.Success(tok=lexer.Token('b', 'b'), rule_name='b'),
-                ])}
-            ),
-            (
-                [lexer.Token('a', 'a'), lexer.Token('a', 'a')],
-                {parser.Success(children=[
-                    parser.Success(tok=lexer.Token('a', 'a'), rule_name='a'),
-                    parser.Failure(pos=1, msg="failed to find literal 'b'"),
-                ])}
-            ),
-        ]:
-            with self.subTest(toks=toks):
-                self.assertEqual(
-                    parser.And(
-                        parser.Literal('a'),
-                        parser.Literal('b'),
-                    )(parser.State(parser.Parser({}, ''), toks)),
-                    expected_result
-                )
+        self.assert_error(
+            lambda: and_(token('a'), token('c')),
+            parser.TerminalError('failed to find literal \'b\'')
+        )
 
     def test_or(self):
+        def or_(*toks: lexer.Token) -> parser.Node:
+            return apply_rule(parser.Or(
+                parser.Literal('a'),
+                parser.Literal('b'),
+            ), *toks)
         self.assertEqual(
-            parser.Or(parser.Literal('a'), parser.Literal('b')),
-            parser.Or(parser.Literal('a'), parser.Literal('b'))
+            or_(token('a')),
+            node(token_node('a'))
         )
-        self.assertNotEqual(
-            parser.Or(parser.Literal('a'), parser.Literal('b')),
-            parser.Or(parser.Literal('a'), parser.Literal('c'))
+        self.assertEqual(
+            or_(token('b')),
+            node(token_node('b'))
         )
-        for toks, expected_result in [
-            (
-                [lexer.Token('a', 'a')],
-                {
-                    parser.Success(tok=lexer.Token('a', 'a'), rule_name='a'),
-                    parser.Failure(pos=0, msg="failed to find literal 'b'"),
-                }
-            ),
-            (
-                [lexer.Token('c', 'c')],
-                {
-                    parser.Failure(pos=0, msg="failed to find literal 'a'"),
-                    parser.Failure(pos=0, msg="failed to find literal 'b'"),
-                }
-            ),
-        ]:
-            with self.subTest(toks=toks):
-                self.assertEqual(
-                    parser.Or(
-                        parser.Literal('a'),
-                        parser.Literal('b'),
-                    )(parser.State(parser.Parser({}, ''), toks)),
-                    expected_result
-                )
+        self.assert_error(
+            lambda: or_(token('c')),
+            parser.CompoundError([
+                parser.TerminalError('failed to find literal \'a\''),
+                parser.TerminalError('failed to find literal \'b\''),
+            ])
+        )
 
     def test_zero_or_more(self):
-        self.assertEqual(
-            parser.ZeroOrMore(parser.Literal('a')),
-            parser.ZeroOrMore(parser.Literal('a'))
-        )
-        self.assertNotEqual(
-            parser.ZeroOrMore(parser.Literal('a')),
-            parser.ZeroOrMore(parser.Literal('b'))
-        )
-        for toks, expected_result in [
+        for toks, expected in [
+            ([], node()),
+            ([token('b')], node()),
+            ([token('a')], node(token_node('a'))),
+            ([token('a'), token('b')], node(token_node('a'))),
+            ([token('a'), token('a')], node(token_node('a'), token_node('a'))),
             (
-                [lexer.Token('a', 'a')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a'
-                        ),
-                    ]),
-                }
-            ),
-            (
-                [lexer.Token('a', 'a'), lexer.Token('b', 'b')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a',
-                        )
-                    ]),
-                }
-            ),
-            (
-                [lexer.Token('a', 'a'), lexer.Token('a', 'a')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a'
-                        ),
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a'
-                        ),
-                    ]),
-                }
-            ),
-            (
-                [],
-                {
-                    parser.Success(),
-                }
-            ),
-            (
-                [lexer.Token('b', 'b')],
-                {
-                    parser.Success(),
-                }
+                [token('a'), token('a'), token('b')],
+                node(token_node('a'), token_node('a'))
             ),
         ]:
             with self.subTest(toks=toks):
                 self.assertEqual(
-                    parser.ZeroOrMore(
-                        parser.Literal('a')
-                    )(parser.State(parser.Parser({}, ''), toks)),
-                    expected_result
-                )
+                    apply_rule(parser.ZeroOrMore(parser.Literal('a')), *toks),
+                    expected)
 
     def test_one_or_more(self):
-        self.assertEqual(
-            parser.OneOrMore(parser.Literal('a')),
-            parser.OneOrMore(parser.Literal('a'))
-        )
-        self.assertNotEqual(
-            parser.OneOrMore(parser.Literal('a')),
-            parser.OneOrMore(parser.Literal('b'))
-        )
-        for toks, expected_result in [
-            (
-                [lexer.Token('a', 'a')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a'
-                        ),
-                    ]),
-                }
-            ),
-            (
-                [lexer.Token('a', 'a'), lexer.Token('b', 'b')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a',
-                        )
-                    ]),
-                }
-            ),
-            (
-                [lexer.Token('a', 'a'), lexer.Token('a', 'a')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a'
-                        ),
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a'
-                        ),
-                    ]),
-                }
-            ),
-            (
-                [],
-                {
-                    parser.Success(children=[parser.Failure(
-                        pos=0, msg="failed to find literal 'a'")]),
-                }
-            ),
-            (
-                [lexer.Token('b', 'b')],
-                {
-                    parser.Success(children=[parser.Failure(
-                        pos=0, msg="failed to find literal 'a'")]),
-                }
-            ),
+        def one_or_more(*toks: lexer.Token) -> parser.Node:
+            return apply_rule(parser.OneOrMore(parser.Literal('a')), *toks)
+        for toks, expected in [
+            ([token('a')], node(token_node('a'))),
+            ([token('a'), token('b')], node(token_node('a'))),
+            ([token('a'), token('a')], node(token_node('a'), token_node('a'))),
+            ([token('a'), token('a'), token('b')],
+             node(token_node('a'), token_node('a'))),
         ]:
             with self.subTest(toks=toks):
-                self.assertEqual(
-                    parser.OneOrMore(
-                        parser.Literal('a')
-                    )(parser.State(parser.Parser({}, ''), toks)),
-                    expected_result
-                )
+                self.assertEqual(one_or_more(*toks), expected)
+        for toks, error in [
+            ([], parser.TerminalError('failed to find literal \'a\': eof')),
+            ([token('b')], parser.TerminalError('failed to find literal \'a\'')),
+        ]:
+            with self.subTest(toks=toks):
+                self.assert_error(lambda: one_or_more(*toks), error)
 
     def test_zero_or_one(self):
-        self.assertEqual(
-            parser.ZeroOrOne(parser.Literal('a')),
-            parser.ZeroOrOne(parser.Literal('a'))
-        )
-        self.assertNotEqual(
-            parser.ZeroOrOne(parser.Literal('a')),
-            parser.ZeroOrOne(parser.Literal('b'))
-        )
-        for toks, expected_result in [
-            (
-                [lexer.Token('a', 'a')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a'
-                        ),
-                    ]),
-                }
-            ),
-            (
-                [lexer.Token('a', 'a'), lexer.Token('b', 'b')],
-                {
-                    parser.Success(children=[
-                        parser.Success(
-                            tok=lexer.Token('a', 'a'),
-                            rule_name='a',
-                        )
-                    ]),
-                }
-            ),
-            (
-                [],
-                {
-                    parser.Success(),
-                }
-            ),
-            (
-                [lexer.Token('b', 'b')],
-                {
-                    parser.Success(),
-                }
-            ),
-        ]:
-            with self.subTest(toks=toks):
-                self.assertEqual(
-                    parser.ZeroOrOne(
-                        parser.Literal('a')
-                    )(parser.State(parser.Parser({}, ''), toks)),
-                    expected_result
-                )
-
-    def test_tail_pattern(self):
         for toks, expected in [
-            (
-                [token('a'), token('b'), token('c')],
-                {empty_success(
-                    token_success('a'),
-                    empty_success(
-                        empty_success(
-                            token_success('b'),
-                            token_success('c'),
-                        )
-                    ),
-                )}
-            ),
-            (
-                [token('a'), token('b'), token('c'),token('b'), token('c')],
-                {empty_success(
-                    token_success('a'),
-                    empty_success(
-                        empty_success(
-                            token_success('b'),
-                            token_success('c'),
-                        ),
-                        empty_success(
-                            token_success('b'),
-                            token_success('c'),
-                        ),
-                    ),
-                )}
-            ),
-            (
-                [token('a'), token('b'), token('c'),token('b'), token('c'),token('b'), token('c')],
-                {empty_success(
-                    token_success('a'),
-                    empty_success(
-                        empty_success(
-                            token_success('b'),
-                            token_success('c'),
-                        ),
-                        empty_success(
-                            token_success('b'),
-                            token_success('c'),
-                        ),
-                        empty_success(
-                            token_success('b'),
-                            token_success('c'),
-                        ),
-                    ),
-                )}
-            ),
+            ([], node()),
+            ([token('b')], node()),
+            ([token('a')], node(token_node('a'))),
+            ([token('a'), token('a')], node(token_node('a'))),
         ]:
             with self.subTest(toks=toks):
                 self.assertEqual(
-                    parser.And(
-                        parser.Literal('a'),
-                        parser.OneOrMore(
-                            parser.And(
-                                parser.Literal('b'),
-                                parser.Literal('c'),
-                            )
-                        ),
-                    )(parser.State(parser.Parser({}, ''), toks=toks)),
+                    apply_rule(parser.ZeroOrOne(parser.Literal('a')), *toks),
                     expected
                 )
 
-    def test_parser_eq(self):
-        self.assertEqual(
-            parser.Parser({'a': parser.Literal('a')}, 'a'),
-            parser.Parser({'a': parser.Literal('a')}, 'a')
-        )
-        self.assertNotEqual(
-            parser.Parser({'a': parser.Literal('a')}, 'a'),
-            parser.Parser({'a': parser.Literal('b')}, 'a')
-        )
-        self.assertNotEqual(
-            parser.Parser({'a': parser.Literal('a')}, 'a'),
-            parser.Parser({'a': parser.Literal('a')}, 'b')
-        )
-
-    def test_parser_success(self):
-        def node(rule_name: Optional[str], *children: parser.Node) -> parser.Node:
-            return parser.Node(rule_name=rule_name, children=list(children))
-
-        def tok(rule_name: str, val: str) -> parser.Node:
-            return parser.Node(rule_name=rule_name, tok=lexer.Token(rule_name, val))
-
-        def int_(val: int) -> parser.Node:
-            return node('expr', tok('int', str(val)))
-
-        def paren_expr(child: parser.Node) -> parser.Node:
-            return node('expr', node('paren_expr', node(None, tok(
-                '(', '('), child, tok(')', ')'))))
-
+    def test_parser(self):
+        def run(*toks: lexer.Token) -> parser.Node:
+            return parser.Parser({
+                'a': parser.OneOrMore(
+                    parser.Ref('b')
+                ),
+                'b': parser.Or(
+                    parser.Ref('c'),
+                    parser.Literal('d'),
+                ),
+                'c': parser.Literal('e'),
+            }, 'a')(list(toks))
         for toks, expected in [
             (
-                [lexer.Token('int', '1')],
-                int_(1)
+                [token('d')],
+                rule_node('a', node(rule_node('b', token_node('d'))))
             ),
             (
-                [lexer.Token('(', '('), lexer.Token(
-                    'int', '1'), lexer.Token(')', ')')],
-                paren_expr(int_(1))
-            ),
-        ]:
-            with self.subTest(toks=toks):
-                self.assertEqual(parser.Parser({
-                    'expr': parser.Or(
-                        parser.Literal('int'),
-                        parser.Ref('paren_expr'),
-                    ),
-                    'paren_expr': parser.And(
-                        parser.Literal('('),
-                        parser.Ref('expr'),
-                        parser.Literal(')'),
-                    ),
-                }, 'expr')(toks), expected)
-
-    def test_parser_fail(self):
-        for toks, expected in [
-            (
-                [lexer.Token('float', '3.14')],
-                'parse error at \'3.14\': "failed to find literal \'(\'" "failed to find literal \'id\'" "failed to find literal \'int\'" "failed to find literal \'str\'"'
+                [token('e')],
+                rule_node(
+                    'a',
+                    node(
+                        rule_node(
+                            'b',
+                            node(
+                                token_node('c', token('e')))))),
             ),
             (
-                [lexer.Token('(', '('), lexer.Token('int', '1')],
-                'parse error at end of input: "failed to find literal \')\'"'
+                [token('d'), token('d')],
+                rule_node('a',
+                          node(rule_node('b', token_node('d'))),
+                          node(rule_node('b', token_node('d'))))
             )
         ]:
             with self.subTest(toks=toks):
-                try:
-                    parser.Parser({
-                        'exprs': parser.OneOrMore(
-                            parser.Ref('expr')
-                        ),
-                        'expr': parser.Or(
-                            parser.Literal('id'),
-                            parser.Literal('int'),
-                            parser.Literal('str'),
-                            parser.Ref('paren_expr'),
-                        ),
-                        'paren_expr': parser.And(
-                            parser.Literal('('),
-                            parser.OneOrMore(
-                                parser.Ref('expr')
-                            ),
-                            parser.Literal(')'),
-                        ),
-                    }, 'exprs')(toks)
-                    self.assertFail()
-                except parser.Error as e:
-                    self.assertEqual(str(e), expected)
+                self.assertEqual(run(*toks), expected)
+        for toks, error in [
+            (
+                [
+                token('d', loc=lexer.Location(1, 0)),
+                token('f', loc=lexer.Location(2, 0)),
+                ],
+                parser.CompoundError([
+                    parser.ContextError(
+                        "failed to apply rule 'a'",
+                        parser.ContextError(
+                            "failed to apply rule 'b'",
+                            parser.ContextError(
+                                "failed to apply rule 'c'",
+                                parser.TerminalError(
+                                    msg="failed to find literal 'e'",
+                                    loc=lexer.Location(line=2, col=0))))),
+                    parser.ContextError(
+                        "failed to apply rule 'a'",
+                        parser.ContextError(
+                            "failed to apply rule 'b'",
+                            parser.TerminalError(
+                                msg="failed to find literal 'd'",
+                                loc=lexer.Location(line=2, col=0))))])
+            ),
+        ]:
+            with self.subTest(toks=toks):
+                self.assert_error(lambda: run(*toks), error)
 
 
 if __name__ == '__main__':
