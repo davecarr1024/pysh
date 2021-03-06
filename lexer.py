@@ -77,7 +77,10 @@ class Literal(processor.Rule[Input, Output]):
         return f'Literal({self.val})'
 
     def __call__(self, context: processor.Context[Input, Output]) -> Output:
-        return Output((Token(self.val.process(context.input.input), context.input.location),))
+        try:
+            return Output((Token(self.val.process(context.input.input), context.input.location),))
+        except processor.Error as e:
+            raise context.error(f'failed to apply regex {self.val}: {e.msg}')
 
 
 class Lexer(processor.Processor[Input, Output]):

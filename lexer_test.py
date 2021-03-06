@@ -101,7 +101,7 @@ class LexerTest(unittest.TestCase):
                              location=lexer.Location(0, 0)),)
             ),
             (
-                'baa',
+                'baac',
                 (
                     lexer.Token(val='b', rule_name='br',
                                 location=lexer.Location(0, 0)),

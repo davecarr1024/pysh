@@ -278,7 +278,7 @@ class Processor(Generic[TI, TO], ABC):
             output = self.rules[rule_name](context)
         except Error as e:
             raise Error(
-                f'error while applying rule {repr(rule_name)}: {e}', context.input)
+                f'error while applying rule {repr(rule_name)}: {e.msg}', e.input or context.input)
         return self.with_rule_name(output, rule_name)
 
     def process(self, input: TI) -> TO:
