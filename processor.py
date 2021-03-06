@@ -275,10 +275,11 @@ class Processor(Generic[TI, TO], ABC):
         if rule_name not in self.rules:
             raise Error(f'unknown rule {repr(rule_name)}', context.input)
         try:
-            return self.rules[rule_name](context)
+            output = self.rules[rule_name](context)
         except Error as e:
             raise Error(
                 f'error while applying rule {repr(rule_name)}: {e}', context.input)
+        return self.with_rule_name(output, rule_name)
 
-    def __call__(self, input: TI) -> TO:
+    def process(self, input: TI) -> TO:
         return self.apply_rule(self.root, Context(self, input))

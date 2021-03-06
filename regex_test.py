@@ -37,36 +37,31 @@ class ClassTest(unittest.TestCase):
 
 
 class RegexTest(unittest.TestCase):
-    regex_ = regex.Regex({
-        'root': processor.UntilEmpty(
-            processor.And(
-                regex.Literal('a'),
-                regex.Class('0', '9'),
-            )
-        )
-    }, 'root')
+    regex_ = regex.Regex(
+        regex.Literal('a'),
+        regex.Class('0', '9'),
+    )
 
     def test_call_success(self):
         for input, output in [
-            ('', ''),
-            ('a0', 'a0'),
-            ('a0a1', 'a0a1'),
+            ('a3', 'a3'),
+            ('a4b', 'a4'),
         ]:
             with self.subTest(input=input, output=output):
                 self.assertEqual(
-                    self.regex_(input),
+                    self.regex_.process(input),
                     output
                 )
 
     def test_call_failure(self):
         for input in [
+            '',
             'b',
             'aa',
-            'a0b',
         ]:
             with self.subTest(input=input):
                 with self.assertRaises(processor.Error):
-                    self.regex_(input)
+                    self.regex_.process(input)
 
 
 if __name__ == '__main__':

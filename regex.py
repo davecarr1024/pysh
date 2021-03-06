@@ -46,11 +46,14 @@ class Class(processor.Rule[str, str]):
 
 
 class Regex(processor.Processor[str, str]):
+    def __init__(self, *rules: processor.Rule[str, str]):
+        super().__init__({'root': processor.And(*rules)}, 'root')
+
     def advance(self, input: str, output: str) -> str:
         return input[len(output):]
 
     def aggregate(self, context: processor.Context[str, str], outputs: Sequence[str]) -> str:
         return ''.join(outputs)
 
-    def empty(self, input: str)->bool:
+    def empty(self, input: str) -> bool:
         return not input

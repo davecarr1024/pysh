@@ -1,101 +1,124 @@
 import lexer
+import processor
+import regex
 import unittest
 
+import unittest.util
+unittest.util._MAX_LENGTH = 1000
 
-# class LexerTest(unittest.TestCase):
-#     def test_take_while(self):
-#         self.assertEqual(lexer.take_while(str.isalpha)('a1'), 'a')
-#         self.assertEqual(lexer.take_while(str.isalpha)('1'), None)
 
-#     def test_literal(self):
-#         self.assertEqual(lexer.Literal('a'), lexer.Literal('a'))
-#         self.assertNotEqual(lexer.Literal('a'), lexer.Literal('b'))
-#         self.assertEqual(lexer.Literal('a')('ab'), 'a')
-#         self.assertEqual(lexer.Literal('a')('b'), None)
+class LocationTest(unittest.TestCase):
+    def test_advance(self):
+        self.assertEqual(
+            lexer.Location(0, 0).advance(
+                lexer.Output([
+                    lexer.Token('a\n\n', lexer.Location(0, 0)),
+                    lexer.Token('b', lexer.Location(0, 0)),
+                ])
+            ),
+            lexer.Location(2, 1)
+        )
 
-#     def test_zero_or_more(self):
-#         self.assertEqual(lexer.ZeroOrMore(lexer.Literal('a')),
-#                          lexer.ZeroOrMore(lexer.Literal('a')))
-#         self.assertNotEqual(
-#             lexer.ZeroOrMore(lexer.Literal('a')),
-#             lexer.ZeroOrMore(lexer.Literal('b')))
-#         self.assertEqual(lexer.ZeroOrMore(lexer.Literal('a'))('b'), '')
-#         self.assertEqual(lexer.ZeroOrMore(lexer.Literal('a'))('ab'), 'a')
-#         self.assertEqual(lexer.ZeroOrMore(lexer.Literal('a'))('aab'), 'aa')
 
-#     def test_one_or_more(self):
-#         self.assertEqual(lexer.OneOrMore(lexer.Literal('a')),
-#                          lexer.OneOrMore(lexer.Literal('a')))
-#         self.assertNotEqual(lexer.OneOrMore(lexer.Literal('a')),
-#                             lexer.OneOrMore(lexer.Literal('b')))
-#         self.assertEqual(lexer.OneOrMore(lexer.Literal('a'))('b'), None)
-#         self.assertEqual(lexer.OneOrMore(lexer.Literal('a'))('ab'), 'a')
-#         self.assertEqual(lexer.OneOrMore(lexer.Literal('a'))('aab'), 'aa')
+class InputTest(unittest.TestCase):
+    def test_advance(self):
+        self.assertEqual(
+            lexer.Input(
+                input='abc',
+                location=lexer.Location(0, 0),
+            ).advance(lexer.Output([
+                lexer.Token('ab', lexer.Location(0, 0)),
+            ])),
+            lexer.Input(
+                input='c',
+                location=lexer.Location(0, 2),
+            )
+        )
 
-#     def test_zero_or_one(self):
-#         self.assertEqual(lexer.ZeroOrOne(lexer.Literal('a')),
-#                          lexer.ZeroOrOne(lexer.Literal('a')))
-#         self.assertNotEqual(lexer.ZeroOrOne(lexer.Literal('a')),
-#                             lexer.ZeroOrOne(lexer.Literal('b')))
-#         self.assertEqual(lexer.ZeroOrOne(lexer.Literal('a'))('b'), '')
-#         self.assertEqual(lexer.ZeroOrOne(lexer.Literal('a'))('ab'), 'a')
+    def test_empty(self):
+        self.assertTrue(lexer.Input('', lexer.Location(0, 0)).empty)
+        self.assertFalse(lexer.Input('a', lexer.Location(0, 0)).empty)
 
-#     def test_and(self):
-#         self.assertEqual(
-#             lexer.And(lexer.Literal('a'), lexer.Literal('b')),
-#             lexer.And(lexer.Literal('a'), lexer.Literal('b')))
-#         self.assertNotEqual(
-#             lexer.And(lexer.Literal('a'), lexer.Literal('b')),
-#             lexer.And(lexer.Literal('a'), lexer.Literal('c')))
-#         self.assertEqual(
-#             lexer.And(lexer.Literal('a'), lexer.Literal('b'))('abc'),
-#             'ab')
-#         self.assertEqual(
-#             lexer.And(lexer.Literal('a'), lexer.Literal('b'))('ac'),
-#             None)
 
-#     def test_or(self):
-#         self.assertEqual(
-#             lexer.Or(lexer.Literal('a'), lexer.Literal('b')),
-#             lexer.Or(lexer.Literal('a'), lexer.Literal('b')))
-#         self.assertNotEqual(
-#             lexer.Or(lexer.Literal('a'), lexer.Literal('b')),
-#             lexer.Or(lexer.Literal('a'), lexer.Literal('c')))
-#         self.assertEqual(
-#             lexer.Or(lexer.Literal('a'), lexer.Literal('b'))('b'),
-#             'b')
-#         self.assertEqual(
-#             lexer.Or(lexer.Literal('a'), lexer.Literal('b'))('c'),
-#             None)
+class TokenTest(unittest.TestCase):
+    def test_with_rule_name(self):
+        self.assertEqual(
+            lexer.Token('a', lexer.Location(0, 1)).with_rule_name('r'),
+            lexer.Token('a', lexer.Location(0, 1), 'r')
+        )
 
-#     def test_not(self):
-#         self.assertEqual(lexer.Not(lexer.Literal('a')),
-#                          lexer.Not(lexer.Literal('a')))
-#         self.assertNotEqual(lexer.Not(lexer.Literal('a')),
-#                             lexer.Not(lexer.Literal('b')))
-#         self.assertEqual(lexer.Not(lexer.Literal('a'))('b'), 'b')
-#         self.assertEqual(lexer.Not(lexer.Literal('a'))('a'), None)
+    def test_len(self):
+        self.assertEqual(len(lexer.Token('abc', lexer.Location(0, 1))), 3)
 
-#     def test_lexer(self):
-#         self.assertEqual(
-#             lexer.Lexer({'a': lexer.Literal('a')},{}),
-#             lexer.Lexer({'a': lexer.Literal('a')},{}),
-#         )
-#         self.assertNotEqual(
-#             lexer.Lexer({'a': lexer.Literal('a')},{}),
-#             lexer.Lexer({'a': lexer.Literal('b')},{}),
-#         )
-#         toks = lexer.Lexer(
-#             {'id': lexer.take_while(str.isalpha)},
-#             {'ws': lexer.take_while(str.isspace)})(' a\nb ')
-#         self.assertEqual([lexer.Token('id', 'a'), lexer.Token('id', 'b')], toks)
-#         self.assertEqual(
-#             [lexer.Location(line=0,col=1),lexer.Location(line=1,col=0)],
-#             [tok.loc for tok in toks]
-#         )
-#         with self.assertRaisesRegex(Exception, 'lex error at 0'):
-#             lexer.Lexer({'id': lexer.take_while(str.isalpha)}, {
-#                         'ws': lexer.take_while(str.isspace)})('(a)')
+
+class OutputTest(unittest.TestCase):
+    def test_with_rule_name(self):
+        self.assertEqual(
+            lexer.Output((
+                lexer.Token('a', lexer.Location(0, 1)),
+                lexer.Token('b', lexer.Location(2, 3)),
+            )).with_rule_name('r'),
+            lexer.Output((
+                lexer.Token('a', lexer.Location(0, 1), 'r'),
+                lexer.Token('b', lexer.Location(2, 3), 'r')
+            ))
+        )
+
+    def test_aggregate(self):
+        self.assertEqual(
+            lexer.Output.aggregate([
+                lexer.Output((
+                    lexer.Token('a', lexer.Location(0, 1)),
+                )),
+                lexer.Output((
+                    lexer.Token('b', lexer.Location(2, 3)),
+                )),
+            ]),
+            lexer.Output((
+                lexer.Token('a', lexer.Location(0, 1)),
+                lexer.Token('b', lexer.Location(2, 3)),
+            ))
+        )
+
+
+class LiteralTest(unittest.TestCase):
+    def test_call(self):
+        self.assertEqual(
+            lexer.Literal(regex.Regex(regex.Literal('a')))(
+                processor.Context(
+                    lexer.Lexer(), lexer.Input('a', lexer.Location(0, 1)))
+            ),
+            lexer.Output((lexer.Token('a', lexer.Location(0, 1)),))
+        )
+
+
+class LexerTest(unittest.TestCase):
+    def test_lex(self):
+        for input, output in [
+            (
+                'aa',
+                (lexer.Token(val='aa', rule_name='ar',
+                             location=lexer.Location(0, 0)),)
+            ),
+            (
+                'baa',
+                (
+                    lexer.Token(val='b', rule_name='br',
+                                location=lexer.Location(0, 0)),
+                    lexer.Token(val='aa', rule_name='ar',
+                                location=lexer.Location(0, 1)),
+                )
+            ),
+        ]:
+            with self.subTest(input=input, output=output):
+                self.assertEqual(
+                    lexer.Lexer(
+                        ar=regex.Regex(
+                            processor.OneOrMore(regex.Literal('a'))),
+                        br=regex.Regex(regex.Literal('b')),
+                    ).lex(input),
+                    output
+                )
 
 
 if __name__ == '__main__':

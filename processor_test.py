@@ -297,7 +297,7 @@ class IntFilterTest(unittest.TestCase):
         self.assertEqual(
             IntFilter({'a': Equals(1)}, '').apply_rule(
                 'a', processor.Context(IntFilter({}, ''), Input((1,)))),
-            Output((1,))
+            Output((1,), rule_name='a')
         )
 
     def test_apply_rule_unknown_rule(self):
@@ -312,8 +312,8 @@ class IntFilterTest(unittest.TestCase):
 
     def test_call(self):
         self.assertEqual(
-            IntFilter({'a': Equals(1)}, 'a')(Input((1,))),
-            Output((1,))
+            IntFilter({'a': Equals(1)}, 'a').process(Input((1,))),
+            Output((1,), rule_name='a')
         )
 
     def test_aggregate_error_keys(self):
