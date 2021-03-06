@@ -3,55 +3,24 @@ from abc import ABC, abstractmethod
 from typing import Dict, Generic, List, NamedTuple, Optional, Sequence, TypeVar
 
 
-class Location(NamedTuple):
-    line: int
-    col: int
-
-    def __lt__(self, rhs: object) -> bool:
-        return isinstance(rhs, self.__class__) and (self.line < rhs.line or self.col < rhs.col)
-
-
-class Error(Exception):
-    def __init__(self, msg: str, location: Optional[Location] = None):
-        super().__init__(f'{msg} at {location}' if location else msg)
-        self.msg = msg
-        self.location = location
-
-    def __eq__(self, rhs: object) -> bool:
-        return isinstance(rhs, self.__class__) and self.msg == rhs.msg and self.location == rhs.location
-
-    def __hash__(self) -> int:
-        return hash((self.msg, self.location))
-
-    def __repr__(self) -> str:
-        return f'Error(msg={repr(self.msg)}, location={self.location})'
-
-    @staticmethod
-    def aggregate(errors: Sequence[Error]) -> Error:
-        loc_errors: Dict[Location, List[Error]] = {}
-        non_loc_errors: List[Error] = []
-        for error in errors:
-            if error.location is None:
-                non_loc_errors.append(error)
-            else:
-                loc_errors.setdefault(error.location, []).append(error)
-
-        def msg(errors: Sequence[Error]) -> str:
-            if not errors:
-                return 'unknown error'
-            elif len(errors) == 1:
-                return errors[0].msg
-            else:
-                return '[%s]' % ', '.join([error.msg for error in errors])
-        if loc_errors:
-            max_loc = max(loc_errors.keys())
-            return Error(msg(loc_errors[max_loc]), max_loc)
-        else:
-            return Error(msg(non_loc_errors))
-
-
 TI = TypeVar('TI')
 TO = TypeVar('TO')
+
+
+class Error(Generic[TI], Exception):
+    def __init__(self, msg: str, input: Optional[TI] = None):
+        super().__init__(f'{msg} at {input}' if input else msg)
+        self.msg = msg
+        self.input = input
+
+    def __eq__(self, rhs: object) -> bool:
+        return isinstance(rhs, self.__class__) and self.msg == rhs.msg and self.input == rhs.input
+
+    def __hash__(self) -> int:
+        return hash((self.msg, self.input))
+
+    def __repr__(self) -> str:
+        return f'Error(msg={repr(self.msg)}, input={self.input})'
 
 
 class Rule(Generic[TI, TO], ABC):
@@ -79,13 +48,15 @@ class Context(Generic[TI, TO]):
     def aggregate(self, outputs: Sequence[TO]) -> TO:
         return self.processor.aggregate(self, outputs)
 
+    def error(self, msg: str)->Error:
+        return Error(msg, self.input)
+
+    def aggregate_errors(self, errors: Sequence[Error])->Error:
+        return self.processor.aggregate_errors(self, errors)
+
     @property
     def empty(self) -> bool:
         return self.processor.empty(self.input)
-
-    @property
-    def location(self) -> Optional[Location]:
-        return self.processor.location_of(self.input)
 
 
 class Ref(Rule[TI, TO]):
@@ -149,11 +120,11 @@ class Or(Rule[TI, TO]):
             except Error as e:
                 errors.append(e)
         if len(outputs) > 1:
-            raise Error(f'ambiguous or result: {outputs}', context.location)
+            raise Error(f'ambiguous or result: {outputs}', context.input)
         elif len(outputs) == 1:
             return outputs[0]
         else:
-            raise Error.aggregate(errors)
+            raise context.processor.aggregate_errors(context, errors)
 
 
 class ZeroOrMore(Rule[TI, TO]):
@@ -275,17 +246,39 @@ class Processor(Generic[TI, TO], ABC):
     def with_rule_name(self, output: TO, rule_name: str) -> TO:
         return output
 
-    def location_of(self, input: TI) -> Optional[Location]:
-        return None
+    def aggregate_error_keys(self, context: Context[TI, TO], keys: Sequence[TI]) -> TI:
+        return keys[0]
+
+    def aggregate_errors(self, context: Context[TI, TO], errors: Sequence[Error]) -> Error:
+        loc_errors: Dict[TI, List[Error]] = {}
+        non_loc_errors: List[Error] = []
+        for error in errors:
+            if error.input is None:
+                non_loc_errors.append(error)
+            else:
+                loc_errors.setdefault(error.input, []).append(error)
+
+        def msg(errors: Sequence[Error]) -> str:
+            if not errors:
+                return 'unknown error'
+            elif len(errors) == 1:
+                return errors[0].msg
+            else:
+                return '[%s]' % ', '.join([error.msg for error in errors])
+        if loc_errors:
+            loc = self.aggregate_error_keys(context, list(loc_errors.keys()))
+            return Error(msg(loc_errors[loc]), loc)
+        else:
+            return Error(msg(non_loc_errors))
 
     def apply_rule(self, rule_name: str, context: Context[TI, TO]) -> TO:
         if rule_name not in self.rules:
-            raise Error(f'unknown rule {repr(rule_name)}', context.location)
+            raise Error(f'unknown rule {repr(rule_name)}', context.input)
         try:
             return self.rules[rule_name](context)
         except Error as e:
             raise Error(
-                f'error while applying rule {repr(rule_name)}: {e}', e.location or context.location)
+                f'error while applying rule {repr(rule_name)}: {e}', context.input)
 
     def __call__(self, input: TI) -> TO:
         return self.apply_rule(self.root, Context(self, input))
