@@ -13,7 +13,7 @@ class Location(NamedTuple):
 
 class Error(Exception):
     def __init__(self, msg: str, location: Optional[Location] = None):
-        super().__init__(f'{msg} at {location}')
+        super().__init__(f'{msg} at {location}' if location else msg)
         self.msg = msg
         self.location = location
 
