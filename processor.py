@@ -9,7 +9,7 @@ TO = TypeVar('TO')
 
 class Error(Generic[TI], Exception):
     def __init__(self, msg: str, input: Optional[TI] = None):
-        super().__init__(f'{msg} at {input}' if input else msg)
+        super().__init__(f'{msg} at {repr(input)}' if input else msg)
         self.msg = msg
         self.input = input
 

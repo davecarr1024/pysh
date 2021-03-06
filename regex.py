@@ -18,7 +18,7 @@ class Literal(processor.Rule[str, str]):
 
     def __call__(self, context: processor.Context[str, str]) -> str:
         if not context.input.startswith(self.val):
-            raise processor.Error(f'failed to match {self}')
+            raise context.error(f'failed to match {self}')
         return self.val
 
 
@@ -41,7 +41,7 @@ class Class(processor.Rule[str, str]):
             raise processor.Error('no input')
         c = context.input[0]
         if c < self.min or c > self.max:
-            raise processor.Error(f'{repr(c)} failed to match {self}')
+            raise context.error(f'failed to match {self}')
         return c
 
 

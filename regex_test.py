@@ -12,7 +12,7 @@ class LiteralTest(unittest.TestCase):
     def test_call(self):
         self.assertEqual(regex.Literal('a')(
             processor.Context(regex.Regex({}, ''), 'a')), 'a')
-        with self.assertRaisesRegex(processor.Error, r"failed to match Literal\('a'\)"):
+        with self.assertRaisesRegex(processor.Error, r"failed to match Literal\('a'\) at \'b\'"):
             regex.Literal('a')(processor.Context(regex.Regex({}, ''), 'b'))
 
 
@@ -31,7 +31,7 @@ class ClassTest(unittest.TestCase):
     def test_call_fail(self):
         with self.subTest(input=input):
             with self.assertRaisesRegex(processor.Error,
-                                        r"'0' failed to match Class\(min='a', max='z'\)"):
+                                        r"failed to match Class\(min='a', max='z'\) at \'0\'"):
                 regex.Class('a', 'z')(
                     processor.Context(regex.Regex({}, ''), '0'))
 
