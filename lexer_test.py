@@ -85,7 +85,7 @@ class LiteralTest(unittest.TestCase):
     def test_call(self):
         self.assertEqual(
             lexer.Literal(regex.Regex(regex.Literal('a')))(
-                processor.Context(
+                lexer.Context(
                     lexer.Lexer(), lexer.Input('a', lexer.Location(0, 1)))
             ),
             lexer.Output((lexer.Token('a', lexer.Location(0, 1)),))
@@ -101,7 +101,7 @@ class LexerTest(unittest.TestCase):
                              location=lexer.Location(0, 0)),)
             ),
             (
-                'baac',
+                'baa',
                 (
                     lexer.Token(val='b', rule_name='br',
                                 location=lexer.Location(0, 0)),

@@ -23,11 +23,6 @@ class Error(Generic[TI], Exception):
         return f'Error(msg={repr(self.msg)}, input={self.input})'
 
 
-class Rule(Generic[TI, TO], ABC):
-    @abstractmethod
-    def __call__(self, context: Context[TI, TO]) -> TO: pass
-
-
 class Context(Generic[TI, TO]):
     def __init__(self, processor: Processor[TI, TO], input: TI):
         self.processor = processor
@@ -48,15 +43,20 @@ class Context(Generic[TI, TO]):
     def aggregate(self, outputs: Sequence[TO]) -> TO:
         return self.processor.aggregate(self, outputs)
 
-    def error(self, msg: str)->Error:
+    def error(self, msg: str) -> Error:
         return Error(msg, self.input)
 
-    def aggregate_errors(self, errors: Sequence[Error])->Error:
+    def aggregate_errors(self, errors: Sequence[Error]) -> Error:
         return self.processor.aggregate_errors(self, errors)
 
     @property
     def empty(self) -> bool:
         return self.processor.empty(self.input)
+
+
+class Rule(Generic[TI, TO], ABC):
+    @abstractmethod
+    def __call__(self, context: Context[TI, TO]) -> TO: pass
 
 
 class Ref(Rule[TI, TO]):

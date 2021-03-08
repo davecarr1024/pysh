@@ -59,11 +59,16 @@ class Output(NamedTuple):
         return Output(sum([output.toks for output in outputs], ()))
 
 
-class Ref(processor.Ref[Input, Output]):
+class Error(processor.Error[Input]):
     pass
 
 
-class Literal(processor.Rule[Input, Output]):
+Context = processor.Context[Input, Output]
+Ref = processor.Ref[Input, Output]
+Rule = processor.Rule[Input, Output]
+
+
+class Literal(Rule):
     def __init__(self, val: regex.Regex):
         self.val = val
 
@@ -76,7 +81,7 @@ class Literal(processor.Rule[Input, Output]):
     def __repr__(self) -> str:
         return f'Literal({self.val})'
 
-    def __call__(self, context: processor.Context[Input, Output]) -> Output:
+    def __call__(self, context: Context) -> Output:
         try:
             return Output((Token(self.val.process(context.input.input), context.input.location),))
         except processor.Error as e:
@@ -85,18 +90,19 @@ class Literal(processor.Rule[Input, Output]):
 
 class Lexer(processor.Processor[Input, Output]):
     def __init__(self, **regexes: regex.Regex):
-        rules: Dict[str, processor.Rule[Input, Output]] = {
+        rules: Dict[str, Rule] = {
             '_root': processor.UntilEmpty(processor.Or(*[Ref(name) for name in regexes.keys()]))}
         for name, regex in regexes.items():
             if name.startswith('_'):
-                raise processor.Error(f'regex name {repr(name)} can\'t start with _')
+                raise processor.Error(
+                    f'regex name {repr(name)} can\'t start with _')
             rules[name] = Literal(regex)
         super().__init__(rules, '_root')
 
     def advance(self, input: Input, output: Output) -> Input:
         return input.advance(output)
 
-    def aggregate(self, context: processor.Context[Input, Output], outputs: Sequence[Output]) -> Output:
+    def aggregate(self, context: Context, outputs: Sequence[Output]) -> Output:
         return Output.aggregate(outputs)
 
     def empty(self, input: Input) -> bool:
@@ -105,7 +111,7 @@ class Lexer(processor.Processor[Input, Output]):
     def with_rule_name(self, output: Output, rule_name: str) -> Output:
         return output if rule_name.startswith('_') else output.with_rule_name(rule_name)
 
-    def aggregate_error_keys(self, context: processor.Context[Input, Output], keys: Sequence[Input]) -> Input:
+    def aggregate_error_keys(self, context: Context, keys: Sequence[Input]) -> Input:
         return max(keys, key=lambda key: key.location)
 
     def lex(self, input: str) -> Sequence[Token]:
