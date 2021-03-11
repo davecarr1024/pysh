@@ -17,6 +17,9 @@ class _Int(_Expr):
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, _Int) and self.val == rhs.val
 
+    def __repr__(self)->str:
+        return f'Int({self.val})'
+
 
 class _Add(_Expr):
     def __init__(self, lhs: _Expr, rhs: _Expr):
@@ -25,6 +28,9 @@ class _Add(_Expr):
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, _Add) and self.lhs == rhs.lhs and self.rhs == rhs.rhs
+
+    def __repr__(self)->str:
+        return f'Add({self.lhs}, {self.rhs})'
 
 
 class _List(_Expr):
@@ -130,14 +136,14 @@ class SyntaxTest(unittest.TestCase):
     def test_terminal(self):
         self.assertEqual(
             self.int_rule()(
-                parser.Node(rule_name='int', tok=lexer.Token('int', '1')),
+                parser.Node(rule_name='int', token=lexer.Token('1', 'int')),
                 []
             ),
             _Int(1)
         )
         self.assertEqual(
             self.int_rule()(
-                parser.Node(rule_name='str', tok=lexer.Token('str', 'abc')),
+                parser.Node(rule_name='str', token=lexer.Token('abc', 'str')),
                 []
             ),
             None
@@ -155,21 +161,21 @@ class SyntaxTest(unittest.TestCase):
                     rule_name='list',
                     children=[
                         parser.Node(rule_name='int',
-                                    tok=lexer.Token('int', '1')),
+                                    token=lexer.Token('1', 'int')),
                         parser.Node(
                             rule_name='add',
                             children=[
                                 parser.Node(rule_name='int',
-                                            tok=lexer.Token('int', '2')),
+                                            token=lexer.Token('2', 'int')),
                                 parser.Node(rule_name='int',
-                                            tok=lexer.Token('int', '3')),
+                                            token=lexer.Token('3', 'int')),
                             ]
                         ),
                         parser.Node(
                             rule_name='not',
                             children=[
                                 parser.Node(rule_name='int',
-                                            tok=lexer.Token('int', '4')),
+                                            token=lexer.Token('4', 'int')),
                             ]
                         ),
                     ]

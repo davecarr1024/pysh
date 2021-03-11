@@ -13,16 +13,16 @@ def token(val: str, location: Optional[lexer.Location] = None, rule_name: Option
     return lexer.Token(val, location or lexer.Location(0, 0), rule_name or val)
 
 
-def token_output(token: lexer.Token, rule_name: Optional[str] = None) -> parser.Output:
-    return parser.Output(token=token, rule_name=rule_name or token.val)
+def token_output(token: lexer.Token, rule_name: Optional[str] = None) -> parser.Node:
+    return parser.Node(token=token, rule_name=rule_name or token.val)
 
 
-def rule_output(rule_name: str, *children: parser.Output) -> parser.Output:
-    return parser.Output(rule_name=rule_name, children=children)
+def rule_output(rule_name: str, *children: parser.Node) -> parser.Node:
+    return parser.Node(rule_name=rule_name, children=children)
 
 
-def output(*children: parser.Output) -> parser.Output:
-    return parser.Output(children=children)
+def output(*children: parser.Node) -> parser.Node:
+    return parser.Node(children=children)
 
 
 class InputTest(unittest.TestCase):
@@ -48,7 +48,7 @@ class InputTest(unittest.TestCase):
         )
 
 
-class OutputTest(unittest.TestCase):
+class NodeTest(unittest.TestCase):
     def test_len(self):
         self.assertEqual(
             len(
@@ -83,7 +83,7 @@ class LiteralTest(unittest.TestCase):
     def test_call_success(self):
         self.assertEqual(
             parser.Literal('a')(context(token('a'))),
-            parser.Output(token=token('a'))
+            parser.Node(token=token('a'))
         )
 
 

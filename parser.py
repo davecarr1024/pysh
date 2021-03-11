@@ -10,15 +10,15 @@ class Input(NamedTuple):
     def empty(self) -> bool:
         return not self.tokens
 
-    def advance(self, output: Output) -> Input:
+    def advance(self, output: Node) -> Input:
         return Input(self.tokens[len(output):])
 
     def max_location(self) -> lexer.Location:
         return max([token.location for token in self.tokens])
 
 
-class Output:
-    def __init__(self, token: Optional[lexer.Token] = None, rule_name: Optional[str] = None, children: Optional[Tuple[Output, ...]] = None):
+class Node:
+    def __init__(self, token: Optional[lexer.Token] = None, rule_name: Optional[str] = None, children: Optional[Tuple[Node, ...]] = None):
         self.token = token
         self.rule_name = rule_name
         self.children = children or ()
@@ -38,13 +38,13 @@ class Output:
     def __len__(self) -> int:
         return (1 if self.token else 0) + sum(map(len, self.children))
 
-    def with_rule_name(self, rule_name: str) -> Output:
-        return Output(self.token, rule_name, self.children)
+    def with_rule_name(self, rule_name: str) -> Node:
+        return Node(self.token, rule_name, self.children)
 
 
-Context = processor.Context[Input, Output]
-Rule = processor.Rule[Input, Output]
-Ref = processor.Ref[Input, Output]
+Context = processor.Context[Input, Node]
+Rule = processor.Rule[Input, Node]
+Ref = processor.Ref[Input, Node]
 
 
 class Literal(Rule):
@@ -60,30 +60,30 @@ class Literal(Rule):
     def __repr__(self) -> str:
         return f'Literal({repr(self.val)})'
 
-    def __call__(self, context: Context) -> Output:
+    def __call__(self, context: Context) -> Node:
         if not context.input.tokens:
             raise context.error(f'No input for {self}')
         tok = context.input.tokens[0]
         if tok.rule_name != self.val:
             raise context.error(f'Failed to match {tok} to {self}')
-        return Output(token=tok)
+        return Node(token=tok)
 
 
-class Parser(processor.Processor[Input, Output]):
-    def advance(self, input: Input, output: Output) -> Input:
+class Parser(processor.Processor[Input, Node]):
+    def advance(self, input: Input, output: Node) -> Input:
         return input.advance(output)
 
-    def aggregate(self, context: Context, outputs: Sequence[Output]) -> Output:
-        return Output(children=tuple(outputs))
+    def aggregate(self, context: Context, outputs: Sequence[Node]) -> Node:
+        return Node(children=tuple(outputs))
 
     def empty(self, input: Input) -> bool:
         return input.empty()
 
-    def with_rule_name(self, output: Output, rule_name: str) -> Output:
+    def with_rule_name(self, output: Node, rule_name: str) -> Node:
         return output.with_rule_name(rule_name)
 
     def aggregate_error_keys(self, context: Context, keys: Sequence[Input]) -> Input:
         return max(keys, key=Input.max_location)
 
-    def parse(self, toks: Sequence[lexer.Token]) -> Output:
+    def parse(self, toks: Sequence[lexer.Token]) -> Node:
         return self.process(Input(toks))

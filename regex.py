@@ -57,3 +57,4 @@ class Regex(processor.Processor[str, str]):
 
     def empty(self, input: str) -> bool:
         return not input
+
