@@ -7,7 +7,7 @@ Rule = Callable[[parser.Node, Sequence[Expr]], Optional[Expr]]
 
 
 def rule_name(rule_name: str, rule: Rule) -> Rule:
-    return lambda node, exprs: rule(node, exprs) if node.rule_name == rule_name else None
+    return lambda node, exprs: rule(node, exprs) if node.rule_name == rule_name or (node.token and node.token.rule_name == rule_name) else None
 
 
 def nary(n: int, rule: Rule) -> Rule:

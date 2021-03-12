@@ -59,10 +59,6 @@ class Output(NamedTuple):
         return Output(sum([output.toks for output in outputs], ()))
 
 
-class Error(processor.Error[Input]):
-    pass
-
-
 Context = processor.Context[Input, Output]
 Ref = processor.Ref[Input, Output]
 Rule = processor.Rule[Input, Output]

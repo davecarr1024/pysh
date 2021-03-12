@@ -62,10 +62,10 @@ class Literal(Rule):
 
     def __call__(self, context: Context) -> Node:
         if not context.input.tokens:
-            raise context.error(f'No input for {self}')
+            raise context.error(f'no input')
         tok = context.input.tokens[0]
         if tok.rule_name != self.val:
-            raise context.error(f'Failed to match {tok} to {self}')
+            raise context.error(f'failed to match {tok}')
         return Node(token=tok)
 
 

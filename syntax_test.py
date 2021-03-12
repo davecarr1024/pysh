@@ -40,6 +40,9 @@ class _List(_Expr):
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, _List) and self.vals == rhs.vals
 
+    def __repr__(self)->str:
+        return f'List({self.vals})'
+
 
 class _Not(_Expr):
     def __init__(self, val: _Expr):
@@ -47,6 +50,9 @@ class _Not(_Expr):
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, _Not) and self.val == rhs.val
+
+    def __repr__(self)->str:
+        return f'Not({self.val})'
 
 
 class SyntaxTest(unittest.TestCase):
@@ -181,7 +187,7 @@ class SyntaxTest(unittest.TestCase):
                     ]
                 )
             ),
-            _List([_Int(1), _Add(_Int(2), _Int(3)), _Not(_Int(4))])
+            [_List([_Int(1), _Add(_Int(2), _Int(3)), _Not(_Int(4))])]
         )
 
 

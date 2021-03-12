@@ -12,11 +12,14 @@ class ErrorTest(unittest.TestCase):
         self.assertEqual(processor.Error('a'), processor.Error('a'))
         self.assertNotEqual(processor.Error('a'), processor.Error('b'))
         self.assertEqual(
-            processor.Error('a', Input((1,))),
-            processor.Error('a', Input((1,))))
+            processor.Error('a', processor.Error('b')),
+            processor.Error('a', processor.Error('b')))
         self.assertNotEqual(
-            processor.Error('a', Input((1,))),
-            processor.Error('a', Input((2,))))
+            processor.Error('a', processor.Error('b')),
+            processor.Error('c', processor.Error('b')))
+        self.assertNotEqual(
+            processor.Error('a', processor.Error('b')),
+            processor.Error('a', processor.Error('c')))
 
 
 class ContextTest(unittest.TestCase):
@@ -103,10 +106,9 @@ class Equals(processor.Rule[Input, Output]):
 
     def __call__(self, context: processor.Context[Input, Output]) -> Output:
         if not context.input.vals:
-            raise processor.Error('no input', context.input)
+            raise context.error('no input')
         elif context.input.vals[0] != self.val:
-            raise processor.Error(
-                f'{context.input.vals[0]} != {self.val}', context.input)
+            raise context.error(f'{context.input.vals[0]} != {self.val}')
         else:
             return Output((self.val,))
 
@@ -158,10 +160,6 @@ class OrTest(unittest.TestCase):
         ]:
             with self.subTest(input=input, output=output):
                 self.assertEqual(self.call(input), Output(output))
-
-    def test_call_ambiguous_failure(self):
-        with self.assertRaisesRegex(processor.Error, 'ambiguous or result'):
-            self.call((1,), [1, 1])
 
     def test_call_failure(self):
         with self.assertRaisesRegex(processor.Error, '[3 != 1, 3 != 2]'):
@@ -306,7 +304,7 @@ class IntFilterTest(unittest.TestCase):
                 'a', processor.Context(IntFilter({}, ''), Input((1,))))
 
     def test_apply_rule_error(self):
-        with self.assertRaisesRegex(processor.Error, 'error while applying rule \'a\': 2 != 1'):
+        with self.assertRaisesRegex(processor.Error, 'while applying rule \'a\'\n  2 != 1'):
             IntFilter({'a': Equals(1)}, '').apply_rule(
                 'a', processor.Context(IntFilter({}, ''), Input((2,))))
 
@@ -315,53 +313,6 @@ class IntFilterTest(unittest.TestCase):
             IntFilter({'a': Equals(1)}, 'a').process(Input((1,))),
             Output((1,), rule_name='a')
         )
-
-    def test_aggregate_error_keys(self):
-        self.assertEqual(
-            IntFilter({}, '').aggregate_error_keys(
-                processor.Context(IntFilter({}, ''), Input([])),
-                [Input((1,)), Input((2,))]),
-            Input((2,))
-        )
-
-    def test_aggregate_errors(self):
-        for input, output in [
-            ([], processor.Error('unknown error')),
-            ([processor.Error('a')], processor.Error('a')),
-            (
-                [processor.Error('a'), processor.Error('b')],
-                processor.Error('[a, b]')
-            ),
-            (
-                [
-                    processor.Error('a', Input((1,))),
-                    processor.Error('b', Input((1,))),
-                ],
-                processor.Error('[a, b]', Input((1,)))
-            ),
-            (
-                [
-                    processor.Error('a', Input((1,))),
-                    processor.Error('b', Input((2,))),
-                ],
-                processor.Error('b', Input((2,)))
-            ),
-            (
-                [
-                    processor.Error('a'),
-                    processor.Error('b', Input((2,))),
-                ],
-                processor.Error('b', Input((2,)))
-            ),
-        ]:
-            with self.subTest(input=input, output=output):
-                self.assertEqual(
-                    IntFilter({}, '').aggregate_errors(
-                        processor.Context(IntFilter({}, ''), Input([])),
-                        input
-                    ),
-                    output
-                )
 
 
 if __name__ == '__main__':

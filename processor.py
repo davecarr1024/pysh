@@ -7,20 +7,23 @@ TI = TypeVar('TI')
 TO = TypeVar('TO')
 
 
-class Error(Generic[TI], Exception):
-    def __init__(self, msg: str, input: Optional[TI] = None):
-        super().__init__(f'{msg} at {repr(input)}' if input else msg)
+class Error(Exception):
+    def __init__(self, msg: str, *inner_errors: Error):
         self.msg = msg
-        self.input = input
+        self.inner_errors = inner_errors
+        super().__init__(repr(self))
 
-    def __eq__(self, rhs: object) -> bool:
-        return isinstance(rhs, self.__class__) and self.msg == rhs.msg and self.input == rhs.input
+    def __eq__(self, rhs: object)->bool:
+        return isinstance(rhs, self.__class__) and self.msg == rhs.msg and self.inner_errors == rhs.inner_errors
 
-    def __hash__(self) -> int:
-        return hash((self.msg, self.input))
+    def __hash__(self)->int:
+        return hash((self.msg, self.inner_errors))
 
-    def __repr__(self) -> str:
-        return f'Error(msg={repr(self.msg)}, input={self.input})'
+    def __repr__(self)->str:
+        return self._repr(0)
+
+    def _repr(self, tabs: int)->str:
+        return '\n%s%s%s' % ('  ' * tabs, self.msg, ''.join([error._repr(tabs+1) for error in self.inner_errors]))
 
 
 class Context(Generic[TI, TO]):
@@ -43,11 +46,8 @@ class Context(Generic[TI, TO]):
     def aggregate(self, outputs: Sequence[TO]) -> TO:
         return self.processor.aggregate(self, outputs)
 
-    def error(self, msg: str) -> Error:
-        return Error(msg, self.input)
-
-    def aggregate_errors(self, errors: Sequence[Error]) -> Error:
-        return self.processor.aggregate_errors(self, errors)
+    def error(self, msg: str, *inner_errors: Error) -> Error:
+        return Error(self.processor.error(self, msg), *inner_errors)
 
     @property
     def empty(self) -> bool:
@@ -113,18 +113,12 @@ class Or(Rule[TI, TO]):
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         errors: List[Error] = []
-        outputs: List[TO] = []
         for rule in self.rules:
             try:
-                outputs.append(rule(context))
+                return context.aggregate([rule(context)])
             except Error as e:
                 errors.append(e)
-        if len(outputs) > 1:
-            raise Error(f'ambiguous or result: {outputs}', context.input)
-        elif len(outputs) == 1:
-            return outputs[0]
-        else:
-            raise context.processor.aggregate_errors(context, errors)
+        raise context.error('or', *errors)
 
 
 class ZeroOrMore(Rule[TI, TO]):
@@ -246,39 +240,16 @@ class Processor(Generic[TI, TO], ABC):
     def with_rule_name(self, output: TO, rule_name: str) -> TO:
         return output
 
-    def aggregate_error_keys(self, context: Context[TI, TO], keys: Sequence[TI]) -> TI:
-        return keys[0]
-
-    def aggregate_errors(self, context: Context[TI, TO], errors: Sequence[Error]) -> Error:
-        loc_errors: Dict[TI, List[Error]] = {}
-        non_loc_errors: List[Error] = []
-        for error in errors:
-            if error.input is None:
-                non_loc_errors.append(error)
-            else:
-                loc_errors.setdefault(error.input, []).append(error)
-
-        def msg(errors: Sequence[Error]) -> str:
-            if not errors:
-                return 'unknown error'
-            elif len(errors) == 1:
-                return errors[0].msg
-            else:
-                return '[%s]' % ', '.join([error.msg for error in errors])
-        if loc_errors:
-            loc = self.aggregate_error_keys(context, list(loc_errors.keys()))
-            return Error(msg(loc_errors[loc]), loc)
-        else:
-            return Error(msg(non_loc_errors))
+    def error(self, context: Context[TI,TO], msg: str)->str:
+        return msg
 
     def apply_rule(self, rule_name: str, context: Context[TI, TO]) -> TO:
         if rule_name not in self.rules:
-            raise Error(f'unknown rule {repr(rule_name)}', context.input)
+            raise context.error(f'unknown rule {repr(rule_name)}')
         try:
             output = self.rules[rule_name](context)
-        except Error as e:
-            raise Error(
-                f'error while applying rule {repr(rule_name)}: {e.msg}', e.input or context.input)
+        except Error as error:
+            raise context.error(f'while applying rule {repr(rule_name)}', error)
         return self.with_rule_name(output, rule_name)
 
     def process(self, input: TI) -> TO:

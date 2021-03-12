@@ -11,9 +11,9 @@ class LiteralTest(unittest.TestCase):
 
     def test_call(self):
         self.assertEqual(regex.Literal('a')(
-            processor.Context(regex.Regex({}, ''), 'a')), 'a')
-        with self.assertRaisesRegex(processor.Error, r"failed to match Literal\('a'\) at \'b\'"):
-            regex.Literal('a')(processor.Context(regex.Regex({}, ''), 'b'))
+            processor.Context(regex.Regex(), 'a')), 'a')
+        with self.assertRaisesRegex(processor.Error, r"failed to match Literal\('a'\)"):
+            regex.Literal('a')(processor.Context(regex.Regex(), 'b'))
 
 
 class ClassTest(unittest.TestCase):
@@ -26,14 +26,27 @@ class ClassTest(unittest.TestCase):
         for input in ['a', 'm', 'z']:
             with self.subTest(input=input):
                 self.assertEqual(regex.Class('a', 'z')(
-                    processor.Context(regex.Regex({}, ''), input)), input)
+                    processor.Context(regex.Regex(), input)), input)
 
     def test_call_fail(self):
         with self.subTest(input=input):
             with self.assertRaisesRegex(processor.Error,
-                                        r"failed to match Class\(min='a', max='z'\) at \'0\'"):
+                                        r"failed to match Class\(min='a', max='z'\)"):
                 regex.Class('a', 'z')(
-                    processor.Context(regex.Regex({}, ''), '0'))
+                    processor.Context(regex.Regex(), '0'))
+
+
+class NotTest(unittest.TestCase):
+    def test_eq(self):
+        self.assertEqual(regex.Not(regex.Literal('a')),regex.Not(regex.Literal('a')))
+        self.assertNotEqual(regex.Not(regex.Literal('a')),regex.Not(regex.Literal('b')))
+
+    def test_call_success(self):
+        self.assertEqual(regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(), 'b')),'b')
+
+    def test_call_fail(self):
+        with self.assertRaisesRegex(processor.Error, 'failed to match Not\(Literal\(\'a\'\)\)'):
+            regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(), 'a'))
 
 
 class RegexTest(unittest.TestCase):

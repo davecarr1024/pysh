@@ -13,8 +13,8 @@ def token(val: str, location: Optional[lexer.Location] = None, rule_name: Option
     return lexer.Token(val, location or lexer.Location(0, 0), rule_name or val)
 
 
-def token_output(token: lexer.Token, rule_name: Optional[str] = None) -> parser.Node:
-    return parser.Node(token=token, rule_name=rule_name or token.val)
+def token_output(token: lexer.Token) -> parser.Node:
+    return parser.Node(token=token)
 
 
 def rule_output(rule_name: str, *children: parser.Node) -> parser.Node:
@@ -73,11 +73,11 @@ def context(*toks: lexer.Token) -> parser.Context:
 
 class LiteralTest(unittest.TestCase):
     def test_call_no_input(self):
-        with self.assertRaisesRegex(processor.Error, 'No input for Literal\(\'a\'\)'):
+        with self.assertRaisesRegex(processor.Error, 'no input'):
             parser.Literal('a')(context())
 
     def test_call_mismatch(self):
-        with self.assertRaisesRegex(processor.Error, 'Failed to match Token\(.*to Literal\(\'a\'\)'):
+        with self.assertRaisesRegex(processor.Error, 'failed to match Token'):
             parser.Literal('a')(context(token('b')))
 
     def test_call_success(self):
@@ -90,8 +90,26 @@ class LiteralTest(unittest.TestCase):
 class ParserTest(unittest.TestCase):
     def test_parse(self):
         for input, expected in [
-            ([token('c')], rule_output('a', output(token_output(token('c'), 'b')))),
-            ([token('d')], rule_output('a', output(token_output(token('d'), 'b')))),
+            (
+                [token('c')], 
+                rule_output('a', 
+                    output(
+                        rule_output('b',
+                            token_output(token('c'))
+                        )
+                    )
+                )
+            ),
+            (
+                [token('d')], 
+                rule_output('a', 
+                    output(
+                        rule_output('b',
+                            token_output(token('d'))
+                        )
+                    )
+                )
+            ),
             (
                 [
                     token('c'),
@@ -100,10 +118,14 @@ class ParserTest(unittest.TestCase):
                 rule_output(
                     'a',
                     output(
-                        token_output(token('c'), 'b'),
+                        rule_output('b',
+                            token_output(token('c'))
+                        )
                     ),
                     output(
-                        token_output(token('d'), 'b'),
+                        rule_output('b',
+                            token_output(token('d'))
+                        )
                     ),
                 )
             ),
