@@ -1,7 +1,7 @@
 from __future__ import annotations
 import processor
 import lexer
-from typing import Dict, NamedTuple, Optional, Sequence, Tuple
+from typing import NamedTuple, Optional, Sequence, Tuple
 
 
 class Input(NamedTuple):
@@ -44,7 +44,6 @@ class Node:
 
 Context = processor.Context[Input, Node]
 Rule = processor.Rule[Input, Node]
-Ref = processor.Ref[Input, Node]
 
 
 class Literal(Rule):
@@ -84,6 +83,9 @@ class Parser(processor.Processor[Input, Node]):
 
     def aggregate_error_keys(self, context: Context, keys: Sequence[Input]) -> Input:
         return max(keys, key=Input.max_location)
+
+    def error(self, context: Context, msg: str) -> str:
+        return f'parse error {repr(msg)} at {context.input.tokens[0].location if context.input.tokens else "eof"}'
 
     def parse(self, toks: Sequence[lexer.Token]) -> Node:
         return self.process(Input(toks))

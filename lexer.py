@@ -1,7 +1,7 @@
 from __future__ import annotations
 import processor
 import regex
-from typing import Dict, NamedTuple, Optional, Sequence, Tuple
+from typing import Mapping, MutableMapping, NamedTuple, Optional, Sequence, Tuple
 
 
 class Location(NamedTuple):
@@ -40,9 +40,10 @@ class Token(NamedTuple):
     val: str
     location: Location
     rule_name: Optional[str] = None
+    include: bool = True
 
     def with_rule_name(self, rule_name: str) -> Token:
-        return Token(self.val, self.location, rule_name)
+        return Token(self.val, self.location, rule_name, self.include)
 
     def __len__(self) -> int:
         return len(self.val)
@@ -60,13 +61,13 @@ class Output(NamedTuple):
 
 
 Context = processor.Context[Input, Output]
-Ref = processor.Ref[Input, Output]
 Rule = processor.Rule[Input, Output]
 
 
 class Literal(Rule):
-    def __init__(self, val: regex.Regex):
+    def __init__(self, val: regex.Regex, include: bool = True):
         self.val = val
+        self.include = include
 
     def __eq__(self, rhs: object) -> bool:
         return isinstance(rhs, self.__class__) and self.val == rhs.val
@@ -79,20 +80,25 @@ class Literal(Rule):
 
     def __call__(self, context: Context) -> Output:
         try:
-            return Output((Token(self.val.process(context.input.input), context.input.location),))
+            return Output((Token(self.val.process(context.input.input), context.input.location, include=self.include),))
         except processor.Error as e:
-            raise context.error(f'failed to apply regex {self.val}: {e.msg}')
+            raise context.error(f'failed to apply regex {self.val}', e)
 
 
 class Lexer(processor.Processor[Input, Output]):
-    def __init__(self, **regexes: regex.Regex):
-        rules: Dict[str, Rule] = {
-            '_root': processor.UntilEmpty(processor.Or(*[Ref(name) for name in regexes.keys()]))}
+    @staticmethod
+    def add_rules(regexes: Mapping[str, regex.Regex], rules: MutableMapping[str, Rule], include: bool) -> None:
         for name, regex in regexes.items():
-            if name.startswith('_'):
-                raise processor.Error(
-                    f'regex name {repr(name)} can\'t start with _')
-            rules[name] = Literal(regex)
+            if name in rules:
+                raise processor.Error(f'duplicate rule {name}')
+            rules[name] = Literal(regex, include)
+
+    def __init__(self, regexes: Mapping[str, regex.Regex], silent_regexes: Mapping[str, regex.Regex]):
+        rules: MutableMapping[str, Rule] = {
+            '_root': processor.UntilEmpty(processor.Or(
+                *[processor.Ref(name) for name in regexes.keys() | silent_regexes.keys()]))}
+        self.add_rules(regexes, rules, True)
+        self.add_rules(silent_regexes, rules, False)
         super().__init__(rules, '_root')
 
     def advance(self, input: Input, output: Output) -> Input:
@@ -110,5 +116,8 @@ class Lexer(processor.Processor[Input, Output]):
     def aggregate_error_keys(self, context: Context, keys: Sequence[Input]) -> Input:
         return max(keys, key=lambda key: key.location)
 
+    def error(self, context: Context, msg: str) -> str:
+        return f'lex error {repr(msg)} at {context.input.location}'
+
     def lex(self, input: str) -> Sequence[Token]:
-        return self.process(Input(input, Location(0, 0))).toks
+        return [tok for tok in self.process(Input(input, Location(0, 0))).toks if tok.include]

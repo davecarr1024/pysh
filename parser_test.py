@@ -135,7 +135,7 @@ class ParserTest(unittest.TestCase):
                     parser.Parser(
                         {
                             'a': processor.UntilEmpty(
-                                parser.Ref('b')
+                                processor.Ref('b')
                             ),
                             'b': processor.Or(
                                 parser.Literal('c'),

@@ -81,5 +81,8 @@ class Regex(processor.Processor[str, str]):
     def aggregate(self, context: Context, outputs: Sequence[str]) -> str:
         return ''.join(outputs)
 
+    def error(self, context: Context, msg: str)->str:
+        return f'regex error {repr(msg)} at {repr(context.input[:min(10,len(context.input))])}'
+
     def empty(self, input: str) -> bool:
         return not input

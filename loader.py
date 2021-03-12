@@ -8,15 +8,16 @@ from typing import Callable, Optional, Sequence
 
 
 def load_regex(input: str) -> regex.Regex:
-    operators = '*+?^!()[]-\\|'
+    operators = '*+?^!()[]-|'
+    reserved_operators = operators + '\\'
     class_pairs = {('a', 'z'), ('A', 'Z'), ('0', '9')}
-    lexer_ = lexer.Lexer(
-        any=regex.Regex(regex.Not(processor.Or(
-            *[regex.Literal(op) for op in operators]))),
-        escape=regex.Regex(processor.Or(
+    lexer_ = lexer.Lexer({
+        'any': regex.Regex(regex.Not(processor.Or(
+            *[regex.Literal(op) for op in reserved_operators]))),
+        'escape': regex.Regex(processor.Or(
             *[regex.Literal('\\%s' % op) for op in operators])),
         **{op: regex.Regex(regex.Literal(op)) for op in operators}
-    )
+    }, {})
     toks = lexer_.lex(input)
     parser_ = parser.Parser({
         'root': processor.UntilEmpty(

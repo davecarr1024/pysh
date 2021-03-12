@@ -4,7 +4,7 @@ import parser
 import syntax
 import loader
 from abc import ABC, abstractmethod
-from typing import Callable, cast, Dict, Optional, Sequence
+from typing import Callable, cast, Mapping, Optional, Sequence
 
 
 class Error(Exception):
@@ -17,7 +17,7 @@ class Val(ABC):
 
 
 class Scope:
-    def __init__(self, parent: Optional[Scope] = None, vals: Optional[Dict[str, Val]] = None):
+    def __init__(self, parent: Optional[Scope] = None, vals: Optional[Mapping[str, Val]] = None):
         self.parent = parent
         self.vals = vals or {}
 

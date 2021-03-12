@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Dict, Generic, List, NamedTuple, Optional, Sequence, TypeVar
+from typing import Any, Generic, List, Mapping, NamedTuple, Optional, Sequence, TypeVar
 
 
 TI = TypeVar('TI')
@@ -59,7 +59,7 @@ class Rule(Generic[TI, TO], ABC):
     def __call__(self, context: Context[TI, TO]) -> TO: pass
 
 
-class Ref(Rule[TI, TO]):
+class Ref(Rule[Any, Any]):
     def __init__(self, val: str):
         self.val = val
 
@@ -214,7 +214,7 @@ class UntilEmpty(Rule[TI, TO]):
 
 
 class Processor(Generic[TI, TO], ABC):
-    def __init__(self, rules: Dict[str, Rule[TI, TO]], root: str):
+    def __init__(self, rules: Mapping[str, Rule[TI, TO]], root: str):
         self.rules = rules
         self.root = root
 
