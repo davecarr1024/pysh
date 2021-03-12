@@ -94,12 +94,13 @@ def load_regex(input: str) -> regex.Regex:
     node = parser_.parse(toks)
 
     syntax_: syntax.Syntax[regex.Rule] = syntax.Syntax(
-        syntax.rule_name('literal',
-                         syntax.sub_syntax(
-                             syntax.get_token_vals('any'),
-                             lambda node, vals: regex.Literal(vals[0])
-                         )
-                         ),
+        syntax.rule_name(
+            'literal',
+            syntax.sub_syntax(
+                syntax.get_token_vals('any'),
+                lambda node, vals: regex.Literal(vals[0])
+            )
+        ),
         syntax.rule_name('zero_or_more', syntax.unary(processor.ZeroOrMore)),
         syntax.rule_name('one_or_more', syntax.unary(processor.OneOrMore)),
         syntax.rule_name('zero_or_one', syntax.unary(processor.ZeroOrOne)),
@@ -107,14 +108,17 @@ def load_regex(input: str) -> regex.Regex:
         syntax.rule_name('not', syntax.unary(regex.Not)),
         syntax.rule_name('and', lambda node, exprs: processor.And(*exprs)),
         syntax.rule_name('or', lambda node, exprs: processor.Or(*exprs)),
-        syntax.rule_name('class',
-                         syntax.sub_syntax(
-                             syntax.get_token_vals('any'),
-                             lambda node, vals: regex.Class(vals[0], vals[1])
-                         )
-                         ),
-        syntax.rule_name('escape', syntax.terminal(
-            lambda val: regex.Literal(val[1:]))),
+        syntax.rule_name(
+            'class',
+            syntax.sub_syntax(
+                syntax.get_token_vals('any'),
+                lambda node, vals: regex.Class(vals[0], vals[1])
+            )
+        ),
+        syntax.rule_name(
+            'escape',
+            syntax.terminal(lambda val: regex.Literal(val[1:]))
+        ),
     )
     rules: Sequence[regex.Rule] = syntax_(node)
     assert len(rules) == 1, (input, toks, node, rules)
@@ -122,10 +126,10 @@ def load_regex(input: str) -> regex.Regex:
 
 
 def load_lexer_and_parser(input: str) -> Tuple[lexer.Lexer, parser.Parser]:
-    operators = {'=', '~=', ';', '=>'}
+    operators = {'=', '~=', ';', '->', '*', '?', '+', '!', '(', ')', '|'}
     lexer_ = lexer.Lexer(
         {
-            'id': load_regex('([a-z]|[A-Z]|_|\-)([a-z]|[A-Z]|[0-9]|_|\-)*'),
+            'id': load_regex('([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*'),
             'regex': load_regex('"(^")*"'),
             **{op: regex.Regex(regex.Literal(op)) for op in operators}
         },
@@ -139,9 +143,9 @@ def load_lexer_and_parser(input: str) -> Tuple[lexer.Lexer, parser.Parser]:
             processor.Ref('decl')
         ),
         'decl': processor.Or(
+            processor.Ref('rule_decl'),
             processor.Ref('lex_rule_decl'),
             processor.Ref('silent_lex_rule_decl'),
-            processor.Ref('rule_decl'),
         ),
         'lex_rule_decl': processor.And(
             parser.Literal('id'),
@@ -156,17 +160,70 @@ def load_lexer_and_parser(input: str) -> Tuple[lexer.Lexer, parser.Parser]:
             parser.Literal(';'),
         ),
         'rule_decl': processor.And(
-            parser.Literal('id'),
-            parser.Literal('=>'),
+            processor.Ref('rule_decl_id'),
+            parser.Literal('->'),
             processor.Ref('rule'),
             parser.Literal(';'),
         ),
+        'rule_decl_id': parser.Literal('id'),
         'rule': processor.Or(
+            processor.Ref('or'),
+            processor.Ref('and'),
+            processor.Ref('operand'),
+        ),
+        'and': processor.And(
+            processor.Ref('operand'),
+            processor.OneOrMore(
+                processor.Ref('operand')
+            ),
+        ),
+        'or': processor.And(
+            processor.Ref('operand'),
+            processor.OneOrMore(
+                processor.And(
+                    parser.Literal('|'),
+                    processor.Ref('operand'),
+                )
+            ),
+        ),
+        'operand': processor.Or(
+            processor.Ref('unary_operation'),
+            processor.Ref('unary_operand'),
+        ),
+        'unary_operand': processor.Or(
             processor.Ref('ref'),
             processor.Ref('literal'),
+            processor.Ref('paren_rule'),
+        ),
+        'paren_rule': processor.And(
+            parser.Literal('('),
+            processor.Ref('rule'),
+            parser.Literal(')'),
         ),
         'ref': parser.Literal('id'),
         'literal': parser.Literal('regex'),
+        'unary_operation': processor.Or(
+            processor.Ref('zero_or_more'),
+            processor.Ref('one_or_more'),
+            processor.Ref('zero_or_one'),
+            processor.Ref('until_empty'),
+        ),
+        'zero_or_more': processor.And(
+            processor.Ref('unary_operand'),
+            parser.Literal('*'),
+        ),
+        'one_or_more': processor.And(
+            processor.Ref('unary_operand'),
+            parser.Literal('+'),
+        ),
+        'zero_or_one': processor.And(
+            processor.Ref('unary_operand'),
+            parser.Literal('?'),
+        ),
+        'until_empty': processor.And(
+            processor.Ref('unary_operand'),
+            parser.Literal('!'),
+        ),
     }, 'root')
     node = parser_.parse(toks)
     loaded_lexer = lexer.Lexer({}, {})
@@ -180,6 +237,7 @@ def load_lexer_and_parser(input: str) -> Tuple[lexer.Lexer, parser.Parser]:
         return impl
 
     def rule_decl(node: parser.Node, exprs: Sequence[parser.Rule]) -> parser.Rule:
+        rule_decl_id = syntax.get_nodes('rule_decl_id')(node)[0]
         id = syntax.get_token_vals('id')(node)[0]
         assert exprs
         rule = exprs[0]
@@ -189,7 +247,7 @@ def load_lexer_and_parser(input: str) -> Tuple[lexer.Lexer, parser.Parser]:
             loaded_parser.root = id
         return rule
 
-    def literal(node: parser.Node, exprs: Sequence[parser.Rule])->parser.Rule:
+    def literal(node: parser.Node, exprs: Sequence[parser.Rule]) -> parser.Rule:
         val = syntax.get_token_vals('regex')(node)[0][1:-1]
         if val not in loaded_lexer.rules:
             loaded_lexer.add_rule(val, load_regex(val))
@@ -207,6 +265,12 @@ def load_lexer_and_parser(input: str) -> Tuple[lexer.Lexer, parser.Parser]:
             )
         ),
         syntax.rule_name('literal', literal),
+        syntax.rule_name('zero_or_more', syntax.unary(processor.ZeroOrMore)),
+        syntax.rule_name('one_or_more', syntax.unary(processor.OneOrMore)),
+        syntax.rule_name('zero_or_one', syntax.unary(processor.ZeroOrOne)),
+        syntax.rule_name('until_empty', syntax.unary(processor.UntilEmpty)),
+        syntax.rule_name('and', lambda node, exprs: processor.And(*exprs)),
+        syntax.rule_name('or', lambda node, exprs: processor.Or(*exprs)),
     )
     syntax_(node)
     return loaded_lexer, loaded_parser

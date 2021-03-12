@@ -12,7 +12,7 @@ class LiteralTest(unittest.TestCase):
     def test_call(self):
         self.assertEqual(regex.Literal('a')(
             processor.Context(regex.Regex(None), 'a')), 'a')
-        with self.assertRaisesRegex(processor.Error, "regex error 'failed to match a' at 'b'"):
+        with self.assertRaisesRegex(processor.Error, "regex error \"failed to match 'a'\" at 'b'"):
             regex.Literal('a')(processor.Context(regex.Regex(None), 'b'))
 
 
@@ -45,7 +45,7 @@ class NotTest(unittest.TestCase):
         self.assertEqual(regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(None), 'b')),'b')
 
     def test_call_fail(self):
-        with self.assertRaisesRegex(processor.Error, "regex error 'failed to match \^a' at 'a'"):
+        with self.assertRaisesRegex(processor.Error, "regex error \"failed to match \^'a'\" at 'a'"):
             regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(None), 'a'))
 
 

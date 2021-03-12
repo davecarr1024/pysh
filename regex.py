@@ -17,7 +17,7 @@ class Literal(Rule):
         return hash(self.val)
 
     def __repr__(self) -> str:
-        return self.val
+        return repr(self.val)
 
     def __call__(self, context: Context) -> str:
         if not context.input.startswith(self.val):

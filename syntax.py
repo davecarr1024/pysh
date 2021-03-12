@@ -41,6 +41,8 @@ class Syntax(Generic[Expr]):
 
 
 SubExpr = TypeVar('SubExpr')
+
+
 def sub_syntax(syntax: Syntax[SubExpr], factory: Callable[[parser.Node, Sequence[SubExpr]], Optional[Expr]]) -> Rule:
     return lambda node, exprs: factory(node, syntax(node))
 
@@ -49,11 +51,19 @@ def aggregate_token_vals(node: parser.Node, exprs: Sequence[Expr]) -> Optional[s
     return node.token.val if node.token else None
 
 
+def aggregate_nodes(node: parser.Node, exprs: Sequence[Expr]) -> parser.Node:
+    return node
+
+
 def token_vals(rule_name: str, factory: Callable[[Sequence[str]], Optional[Expr]]) -> Rule:
     def impl(node: parser.Node, exprs: Sequence[Expr]) -> Optional[Expr]:
         return factory(Syntax(lambda node, exprs: node.token.val if node.token and node.token.rule_name == rule_name else None)(node))
     return impl
 
 
-def get_token_vals(token_rule_name: str)->Syntax[str]:
+def get_token_vals(token_rule_name: str) -> Syntax[str]:
     return Syntax(rule_name(token_rule_name, aggregate_token_vals))
+
+
+def get_nodes(rule_name_: str) -> Syntax[parser.Node]:
+    return Syntax(rule_name(rule_name_, aggregate_nodes))

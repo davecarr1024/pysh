@@ -107,14 +107,49 @@ class LoaderTest(unittest.TestCase):
                 parser.Parser({}, '')
             ),
             (
-                'a => b;',
+                'a -> b;',
                 lexer.Lexer({}, {}),
                 parser.Parser({'a': processor.Ref('b')}, 'a')
             ),
             (
-                'a => "b";',
+                'a -> "b";',
                 lexer.Lexer({'b': loader.load_regex('b')}, {}),
                 parser.Parser({'a': parser.Literal('b')}, 'a')
+            ),
+            (
+                'a -> b*;',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.ZeroOrMore(processor.Ref('b'))}, 'a')
+            ),
+            (
+                'a -> b+;',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.OneOrMore(processor.Ref('b'))}, 'a')
+            ),
+            (
+                'a -> b?;',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.ZeroOrOne(processor.Ref('b'))}, 'a')
+            ),
+            (
+                'a -> b!;',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.UntilEmpty(processor.Ref('b'))}, 'a')
+            ),
+            (
+                'a -> (b);',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.Ref('b')}, 'a')
+            ),
+            (
+                'a -> b c;',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.And(processor.Ref('b'),processor.Ref('c'))}, 'a')
+            ),
+            (
+                'a -> b | c;',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.Or(processor.Ref('b'),processor.Ref('c'))}, 'a')
             ),
         ]:
             with self.subTest(input=input):

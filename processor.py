@@ -87,7 +87,7 @@ class And(Rule[TI, TO]):
         return hash(self.rules)
 
     def __repr__(self) -> str:
-        return '(%s)' % ''.join(map(repr, self.rules))
+        return '(%s)' % ' '.join(map(repr, self.rules))
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         outputs: List[TO] = []
@@ -109,7 +109,7 @@ class Or(Rule[TI, TO]):
         return hash(self.rules)
 
     def __repr__(self) -> str:
-        return '(%s)' % '|'.join(map(repr, self.rules))
+        return '(%s)' % ' | '.join(map(repr, self.rules))
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         errors: List[Error] = []
