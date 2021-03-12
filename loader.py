@@ -4,7 +4,7 @@ import parser
 import processor
 import regex
 import syntax
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, Tuple
 
 
 def load_regex(input: str) -> regex.Regex:
@@ -20,9 +20,6 @@ def load_regex(input: str) -> regex.Regex:
     }, {})
     toks = lexer_.lex(input)
     parser_ = parser.Parser({
-        'root': processor.UntilEmpty(
-            processor.Ref('rule'),
-        ),
         'rule': processor.Or(
             processor.Ref('or'),
             processor.Ref('and'),
@@ -93,16 +90,16 @@ def load_regex(input: str) -> regex.Regex:
             parser.Literal('^'),
             processor.Ref('unary_operand'),
         ),
-    }, 'root')
+    }, 'rule')
     node = parser_.parse(toks)
 
-    def any(factory: Callable[[Sequence[str]], regex.Rule]) -> syntax.Rule:
-        def impl(node: parser.Node, exprs: Sequence[regex.Rule]) -> Optional[regex.Rule]:
-            return factory(syntax.Syntax({syntax.rule_name('any', lambda node, exprs: node.token and node.token.val)})(node))
-        return impl
-
-    syntax_ = syntax.Syntax({
-        syntax.rule_name('literal', any(lambda vals: regex.Literal(vals[0]))),
+    syntax_: syntax.Syntax[regex.Rule] = syntax.Syntax(
+        syntax.rule_name('literal',
+                         syntax.sub_syntax(
+                             syntax.get_token_vals('any'),
+                             lambda node, vals: regex.Literal(vals[0])
+                         )
+                         ),
         syntax.rule_name('zero_or_more', syntax.unary(processor.ZeroOrMore)),
         syntax.rule_name('one_or_more', syntax.unary(processor.OneOrMore)),
         syntax.rule_name('zero_or_one', syntax.unary(processor.ZeroOrOne)),
@@ -110,10 +107,106 @@ def load_regex(input: str) -> regex.Regex:
         syntax.rule_name('not', syntax.unary(regex.Not)),
         syntax.rule_name('and', lambda node, exprs: processor.And(*exprs)),
         syntax.rule_name('or', lambda node, exprs: processor.Or(*exprs)),
-        syntax.rule_name('class', any(
-            lambda vals: regex.Class(vals[0], vals[1]))),
+        syntax.rule_name('class',
+                         syntax.sub_syntax(
+                             syntax.get_token_vals('any'),
+                             lambda node, vals: regex.Class(vals[0], vals[1])
+                         )
+                         ),
         syntax.rule_name('escape', syntax.terminal(
             lambda val: regex.Literal(val[1:]))),
-    })
+    )
     rules: Sequence[regex.Rule] = syntax_(node)
-    return regex.Regex(*rules)
+    assert len(rules) == 1, (input, toks, node, rules)
+    return regex.Regex(rules[0])
+
+
+def load_lexer_and_parser(input: str) -> Tuple[lexer.Lexer, parser.Parser]:
+    operators = {'=', '~=', ';', '=>'}
+    lexer_ = lexer.Lexer(
+        {
+            'id': load_regex('([a-z]|[A-Z]|_|\-)([a-z]|[A-Z]|[0-9]|_|\-)*'),
+            'regex': load_regex('"(^")*"'),
+            **{op: regex.Regex(regex.Literal(op)) for op in operators}
+        },
+        {
+            'ws': regex.Regex(processor.OneOrMore(processor.Or(*[regex.Literal(val) for val in ' \t\n']))),
+        }
+    )
+    toks = lexer_.lex(input)
+    parser_ = parser.Parser({
+        'root': processor.UntilEmpty(
+            processor.Ref('decl')
+        ),
+        'decl': processor.Or(
+            processor.Ref('lex_rule_decl'),
+            processor.Ref('silent_lex_rule_decl'),
+            processor.Ref('rule_decl'),
+        ),
+        'lex_rule_decl': processor.And(
+            parser.Literal('id'),
+            parser.Literal('='),
+            parser.Literal('regex'),
+            parser.Literal(';'),
+        ),
+        'silent_lex_rule_decl': processor.And(
+            parser.Literal('id'),
+            parser.Literal('~='),
+            parser.Literal('regex'),
+            parser.Literal(';'),
+        ),
+        'rule_decl': processor.And(
+            parser.Literal('id'),
+            parser.Literal('=>'),
+            processor.Ref('rule'),
+            parser.Literal(';'),
+        ),
+        'rule': processor.Or(
+            processor.Ref('ref'),
+            processor.Ref('literal'),
+        ),
+        'ref': parser.Literal('id'),
+        'literal': parser.Literal('regex'),
+    }, 'root')
+    node = parser_.parse(toks)
+    loaded_lexer = lexer.Lexer({}, {})
+    loaded_parser = parser.Parser({}, '')
+
+    def lex_rule_decl(include: bool) -> syntax.Rule:
+        def impl(node: parser.Node, exprs: Sequence[parser.Rule]) -> None:
+            id = syntax.get_token_vals('id')(node)[0]
+            val = syntax.get_token_vals('regex')(node)[0][1:-1]
+            loaded_lexer.add_rule(id, load_regex(val), include)
+        return impl
+
+    def rule_decl(node: parser.Node, exprs: Sequence[parser.Rule]) -> parser.Rule:
+        id = syntax.get_token_vals('id')(node)[0]
+        assert exprs
+        rule = exprs[0]
+        assert not id in loaded_parser.rules, f'duplicate rule {repr(id)}'
+        loaded_parser.rules[id] = rule
+        if not loaded_parser.root:
+            loaded_parser.root = id
+        return rule
+
+    def literal(node: parser.Node, exprs: Sequence[parser.Rule])->parser.Rule:
+        val = syntax.get_token_vals('regex')(node)[0][1:-1]
+        if val not in loaded_lexer.rules:
+            loaded_lexer.add_rule(val, load_regex(val))
+        return parser.Literal(val)
+
+    syntax_: syntax.Syntax[parser.Rule] = syntax.Syntax(
+        syntax.rule_name('lex_rule_decl', lex_rule_decl(True)),
+        syntax.rule_name('silent_lex_rule_decl', lex_rule_decl(False)),
+        syntax.rule_name('rule_decl', rule_decl),
+        syntax.rule_name(
+            'ref',
+            syntax.sub_syntax(
+                syntax.get_token_vals('id'),
+                lambda node, vals: processor.Ref(vals[0])
+            )
+        ),
+        syntax.rule_name('literal', literal),
+    )
+    syntax_(node)
+    return loaded_lexer, loaded_parser

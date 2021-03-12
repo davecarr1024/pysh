@@ -17,7 +17,7 @@ class Literal(Rule):
         return hash(self.val)
 
     def __repr__(self) -> str:
-        return f'Literal({repr(self.val)})'
+        return self.val
 
     def __call__(self, context: Context) -> str:
         if not context.input.startswith(self.val):
@@ -37,7 +37,7 @@ class Class(Rule):
         return hash((self.min, self.max))
 
     def __repr__(self) -> str:
-        return f'Class(min={repr(self.min)}, max={repr(self.max)})'
+        return f'[{self.min}-{self.max}]'
 
     def __call__(self, context: Context) -> str:
         if not context.input:
@@ -59,7 +59,7 @@ class Not(Rule):
         return hash(self.rule)
 
     def __repr__(self) -> str:
-        return f'Not({self.rule})'
+        return f'^{self.rule}'
 
     def __call__(self, context: Context) -> str:
         if not context.input:
@@ -72,8 +72,11 @@ class Not(Rule):
 
 
 class Regex(processor.Processor[str, str]):
-    def __init__(self, *rules: Rule):
-        super().__init__({'root': processor.And(*rules)}, 'root')
+    def __init__(self, rule: Rule):
+        super().__init__({'root': rule}, 'root')
+
+    def __repr__(self)->str:
+        return repr(self.rules[self.root])
 
     def advance(self, input: str, output: str) -> str:
         return input[len(output):]

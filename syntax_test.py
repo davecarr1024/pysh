@@ -157,12 +157,12 @@ class SyntaxTest(unittest.TestCase):
 
     def test_syntax(self):
         self.assertEqual(
-            syntax.Syntax({
+            syntax.Syntax(
                 self.int_rule(),
                 self.list_rule(),
                 self.add_rule(),
                 self.not_rule(),
-            })(
+            )(
                 parser.Node(
                     rule_name='list',
                     children=[

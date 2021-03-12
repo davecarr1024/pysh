@@ -94,6 +94,35 @@ class LoaderTest(unittest.TestCase):
             with self.subTest(input=input, expected=expected):
                 self.assertEqual(loader.load_regex(input), expected)
 
+    def test_load_lexer_and_parser(self):
+        for input, expected_lexer, expected_parser in [
+            (
+                'id = "a";',
+                lexer.Lexer({'id': loader.load_regex('a')}, {}),
+                parser.Parser({}, '')
+            ),
+            (
+                'id ~= "a";',
+                lexer.Lexer({}, {'id': loader.load_regex('a')}),
+                parser.Parser({}, '')
+            ),
+            (
+                'a => b;',
+                lexer.Lexer({}, {}),
+                parser.Parser({'a': processor.Ref('b')}, 'a')
+            ),
+            (
+                'a => "b";',
+                lexer.Lexer({'b': loader.load_regex('b')}, {}),
+                parser.Parser({'a': parser.Literal('b')}, 'a')
+            ),
+        ]:
+            with self.subTest(input=input):
+                actual_lexer, actual_parser = loader.load_lexer_and_parser(
+                    input)
+                self.assertEqual(actual_lexer, expected_lexer)
+                self.assertEqual(actual_parser, expected_parser)
+
 
 if __name__ == '__main__':
     unittest.main()

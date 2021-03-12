@@ -1,7 +1,7 @@
 from __future__ import annotations
 import processor
 import regex
-from typing import Mapping, MutableMapping, NamedTuple, Optional, Sequence, Tuple
+from typing import cast, Mapping, MutableMapping, NamedTuple, Optional, Sequence, Tuple
 
 
 class Location(NamedTuple):
@@ -76,7 +76,7 @@ class Literal(Rule):
         return hash(self.val)
 
     def __repr__(self) -> str:
-        return f'Literal({self.val})'
+        return f'Literal(val={self.val}, include={self.include})'
 
     def __call__(self, context: Context) -> Output:
         try:
@@ -86,20 +86,31 @@ class Literal(Rule):
 
 
 class Lexer(processor.Processor[Input, Output]):
-    @staticmethod
-    def add_rules(regexes: Mapping[str, regex.Regex], rules: MutableMapping[str, Rule], include: bool) -> None:
-        for name, regex in regexes.items():
-            if name in rules:
-                raise processor.Error(f'duplicate rule {name}')
-            rules[name] = Literal(regex, include)
-
     def __init__(self, regexes: Mapping[str, regex.Regex], silent_regexes: Mapping[str, regex.Regex]):
-        rules: MutableMapping[str, Rule] = {
-            '_root': processor.UntilEmpty(processor.Or(
-                *[processor.Ref(name) for name in regexes.keys() | silent_regexes.keys()]))}
-        self.add_rules(regexes, rules, True)
-        self.add_rules(silent_regexes, rules, False)
-        super().__init__(rules, '_root')
+        super().__init__({}, '_root')
+        self.add_rules(regexes, True)
+        self.add_rules(silent_regexes, False)
+
+    def __repr__(self):
+        # return repr(self.rules)
+        def format_rule(name: str, rule: Rule) -> str:
+            literal = cast(Literal, rule)
+            return '\n%s %s "%s";' % (name, '=' if literal.include else '~=', repr(literal.val))
+        return ''.join([
+            format_rule(name, rule)
+            for name, rule in self.rules.items()
+            if not name.startswith('_')
+        ])
+
+    def add_rules(self, rules: Mapping[str, regex.Regex], include: bool=True)->None:
+        for name, rule in rules.items():
+            self.add_rule(name, rule, include)
+
+    def add_rule(self, name: str, rule: regex.Regex, include: bool=True)->None:
+        if name in self.rules:
+            raise processor.Error(f'duplicate rule {name}')
+        self.rules[name] = Literal(rule, include)
+        self.rules[self.root] = processor.UntilEmpty(processor.Or(*[processor.Ref(rule_name) for rule_name in self.rules.keys() if not rule_name.startswith('_')]))
 
     def advance(self, input: Input, output: Output) -> Input:
         return input.advance(output)

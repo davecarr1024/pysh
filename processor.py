@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Any, Generic, List, Mapping, NamedTuple, Optional, Sequence, TypeVar
+from typing import Any, Generic, List, MutableMapping, NamedTuple, Optional, Sequence, TypeVar
 
 
 TI = TypeVar('TI')
@@ -70,7 +70,7 @@ class Ref(Rule[Any, Any]):
         return hash(self.val)
 
     def __repr__(self) -> str:
-        return f'Ref({self.val})'
+        return self.val
 
     def __call__(self, context: Context) -> TO:
         return context.aggregate([context.processor.apply_rule(self.val, context)])
@@ -87,7 +87,7 @@ class And(Rule[TI, TO]):
         return hash(self.rules)
 
     def __repr__(self) -> str:
-        return f'And({self.rules})'
+        return '(%s)' % ''.join(map(repr, self.rules))
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         outputs: List[TO] = []
@@ -109,7 +109,7 @@ class Or(Rule[TI, TO]):
         return hash(self.rules)
 
     def __repr__(self) -> str:
-        return f'Or({self.rules})'
+        return '(%s)' % '|'.join(map(repr, self.rules))
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         errors: List[Error] = []
@@ -132,7 +132,7 @@ class ZeroOrMore(Rule[TI, TO]):
         return hash(self.rule)
 
     def __repr__(self) -> str:
-        return f'ZeroOrMore({self.rule})'
+        return f'{self.rule}*'
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         outputs: List[TO] = []
@@ -156,7 +156,7 @@ class OneOrMore(Rule[TI, TO]):
         return hash(self.rule)
 
     def __repr__(self) -> str:
-        return f'OneOrMore({self.rule})'
+        return f'{self.rule}+'
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         output = self.rule(context)
@@ -182,7 +182,7 @@ class ZeroOrOne(Rule[TI, TO]):
         return hash(self.rule)
 
     def __repr__(self) -> str:
-        return f'ZeroOrOne({self.rule})'
+        return f'{self.rule}?'
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         try:
@@ -202,7 +202,7 @@ class UntilEmpty(Rule[TI, TO]):
         return hash(self.rule)
 
     def __repr__(self) -> str:
-        return f'UntilEmpty({self.rule})'
+        return f'{self.rule}!'
 
     def __call__(self, context: Context[TI, TO]) -> TO:
         outputs: List[TO] = []
@@ -214,7 +214,7 @@ class UntilEmpty(Rule[TI, TO]):
 
 
 class Processor(Generic[TI, TO], ABC):
-    def __init__(self, rules: Mapping[str, Rule[TI, TO]], root: str):
+    def __init__(self, rules: MutableMapping[str, Rule[TI, TO]], root: str):
         self.rules = rules
         self.root = root
 

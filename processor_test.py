@@ -1,6 +1,6 @@
 from __future__ import annotations
 import processor
-from typing import Mapping, NamedTuple, Optional, Sequence, Tuple
+from typing import MutableMapping, NamedTuple, Optional, Sequence, Tuple
 import unittest
 
 import unittest.util
@@ -271,7 +271,7 @@ class RefTest(unittest.TestCase):
 
 
 class IntFilter(processor.Processor[Input, Output]):
-    def __init__(self, rules: Mapping[str, processor.Rule[Input, Output]], root: str):
+    def __init__(self, rules: MutableMapping[str, processor.Rule[Input, Output]], root: str):
         super().__init__(rules, root)
 
     def advance(self, input: Input, output: Output) -> Input:

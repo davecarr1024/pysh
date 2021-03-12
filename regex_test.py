@@ -11,9 +11,9 @@ class LiteralTest(unittest.TestCase):
 
     def test_call(self):
         self.assertEqual(regex.Literal('a')(
-            processor.Context(regex.Regex(), 'a')), 'a')
-        with self.assertRaisesRegex(processor.Error, r"failed to match Literal\('a'\)"):
-            regex.Literal('a')(processor.Context(regex.Regex(), 'b'))
+            processor.Context(regex.Regex(None), 'a')), 'a')
+        with self.assertRaisesRegex(processor.Error, "regex error 'failed to match a' at 'b'"):
+            regex.Literal('a')(processor.Context(regex.Regex(None), 'b'))
 
 
 class ClassTest(unittest.TestCase):
@@ -26,14 +26,14 @@ class ClassTest(unittest.TestCase):
         for input in ['a', 'm', 'z']:
             with self.subTest(input=input):
                 self.assertEqual(regex.Class('a', 'z')(
-                    processor.Context(regex.Regex(), input)), input)
+                    processor.Context(regex.Regex(None), input)), input)
 
     def test_call_fail(self):
         with self.subTest(input=input):
             with self.assertRaisesRegex(processor.Error,
-                                        r"failed to match Class\(min='a', max='z'\)"):
+                                        "regex error 'failed to match \[a\-z\]' at '0'"):
                 regex.Class('a', 'z')(
-                    processor.Context(regex.Regex(), '0'))
+                    processor.Context(regex.Regex(None), '0'))
 
 
 class NotTest(unittest.TestCase):
@@ -42,17 +42,19 @@ class NotTest(unittest.TestCase):
         self.assertNotEqual(regex.Not(regex.Literal('a')),regex.Not(regex.Literal('b')))
 
     def test_call_success(self):
-        self.assertEqual(regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(), 'b')),'b')
+        self.assertEqual(regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(None), 'b')),'b')
 
     def test_call_fail(self):
-        with self.assertRaisesRegex(processor.Error, 'failed to match Not\(Literal\(\'a\'\)\)'):
-            regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(), 'a'))
+        with self.assertRaisesRegex(processor.Error, "regex error 'failed to match \^a' at 'a'"):
+            regex.Not(regex.Literal('a'))(regex.Context(regex.Regex(None), 'a'))
 
 
 class RegexTest(unittest.TestCase):
     regex_ = regex.Regex(
-        regex.Literal('a'),
-        regex.Class('0', '9'),
+        processor.And(
+            regex.Literal('a'),
+            regex.Class('0', '9'),
+        )
     )
 
     def test_call_success(self):
